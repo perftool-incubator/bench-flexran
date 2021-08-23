@@ -1,0 +1,287 @@
+#!/bin/bash
+
+#######################################################################################
+# Crucible Flexran client RUN function.
+#   This module orchestrates L1 and Testmac processes.
+#   It waits for Testmac to finish testing and then shuts down the processes.
+#
+#   'test-file' mode: Testmac exec's a list of tests specified in a test config file
+#                     i.e test_file=/opt/flexran/tests/nr5g/fd/testmac_fd_mu0_5mhz.cfg.
+#
+#   'user-cmd' mode:  Testmac exec's a user-provided command likely for a single test.
+#                     i.e "run 2 1 100 1001"
+#######################################################################################
+
+FLEXRAN_LOG_FILE=flexran-client.log
+
+exec >$FLEXRAN_LOG_FILE
+exec 2>&1
+
+. /usr/bin/flexran-base || (echo "/usr/bin/flexran-base not found"; exit 1)
+dump_runtime
+validate_label
+validate_sw_prereqs
+
+export FLEXRAN_ROOT=/opt/flexran
+export FLEXRAN_L1_DIR=$FLEXRAN_ROOT/bin/nr5g/gnb/l1
+export FLEXRAN_L2_DIR=$FLEXRAN_ROOT/bin/nr5g/gnb/testmac
+L1_PIPE=/tmp/flexran
+L2_PIPE=/tmp/testmac
+FLEXRAN_RESULT_FILE=l1_mlog_stats.txt
+FIRST_RESULT_WAIT_SEC=180
+COMPLETION_SIGNATURE="All Tests Completed"
+FLEXRAN_MIN_WCPUS=9
+L1_CFG_FILE=$FLEXRAN_L1_DIR/phycfg_timer.xml
+TESTMAC_CFG_FILE=$FLEXRAN_L2_DIR/testmac_cfg.xml
+
+test_file="none"
+fec_mode="hw"
+user_cmd="version"
+usr1=""
+usr2=""
+usr3=""
+usr4=""
+usr5=""
+
+function init_mount_fs {
+    # Flexran S/W is ~100GB. In development, we host mount it. Now, link it to the desired filepaths.
+    ln -s /tmp/opt/flexran /opt/flexran
+    ln -s /tmp/opt/intel /opt/intel
+    ln -s /tmp/opt/dpdk-20.11 /opt/dpdk-20.11
+    ln -s /tmp/opt/configure_cfg_files.sh /opt/configure_cfg_files.sh
+    ln -s /tmp/opt/flexran_env_vars.sh /opt/flexran_env_vars.sh
+}
+
+function set_fec_mode {
+    if [ "$fec_mode" == "hw" ]; then
+        if [ -z "$PCIDEVICE_INTEL_COM_INTEL_FEC_5G" ]; then
+            exit_error "PCIDEVICE_INTEL_COM_INTEL_FEC_5G is not defined. This must be defined to run flexran HW FEC"
+        fi
+        sed -i "s#<dpdkBasebandDevice>.*</dpdkBasebandDevice>#<dpdkBasebandDevice>${PCIDEVICE_INTEL_COM_INTEL_FEC_5G}</dpdkBasebandDevice>#" $L1_CFG_FILE
+        sed -i 's#<dpdkBasebandFecMode>.*</dpdkBasebandFecMode>#<dpdkBasebandFecMode>1</dpdkBasebandFecMode>#' $L1_CFG_FILE
+    else
+        sed -i 's#<dpdkBasebandFecMode>.*</dpdkBasebandFecMode>#<dpdkBasebandFecMode>0</dpdkBasebandFecMode>#' $L1_CFG_FILE
+    fi
+ }
+
+function pin_cores {
+    # Example: WORKLOAD_CPUS=11,12,13,14,15
+    if [ $(echo "$WORKLOAD_CPUS" | awk -F "," '{print NF-1}') -lt $FLEXRAN_MIN_WCPUS ]; then
+        exit_error "Not enough CPUS. Flexran requires $FLEXRAN_MIN_CPUS or more CPUs"
+    fi
+
+    n=1
+    IFS=","
+
+    # TBD: take NUMA locality into account
+    for C in $WORKLOAD_CPUS
+    do
+        if [ $n == 1 ]; then
+            sed -i "s#<systemThread>.*,.*,.*</systemThread>#<systemThread>${C}, 0, 0</systemThread>#" $L1_CFG_FILE
+        elif [ $n == 2 ]; then
+            sed -i "s#<timerThread>.*,.*,.*</timerThread>#<timerThread>${C}, 6, 0</timerThread>#" $L1_CFG_FILE
+        elif [ $n == 3 ]; then
+            sed -i "s#<FpgaDriverCpuInfo>.*,.*,.*</FpgaDriverCpuInfo>#<FpgaDriverCpuInfo>${C}, 96, 0</FpgaDriverCpuInfo>#" $L1_CFG_FILE
+        elif [ $n == 4 ]; then
+            sed -i "s#<FrontHaulCpuInfo>.*,.*,*</FrontHaulCpuInfo>#<FrontHaulCpuInfo>${C}, 86, 0</FrontHaulCpuInfo>#" $L1_CFG_FILE
+        elif [ $n == 5 ]; then
+            sed -i "s#<radioDpdkMaster>.*,.*,.*</radioDpdkMaster>#<radioDpdkMaster>${C}, 99, 0</radioDpdkMaster>#" $L1_CFG_FILE
+        elif [ $n == 6 ]; then
+            sed -i "s#<wlsRxThread>.*,.*,.*</wlsRxThread>#<wlsRxThread>${C}, 90, 0</wlsRxThread>#" $TESTMAC_CFG_FILE
+        elif [ $n == 7 ]; then
+            sed -i "s#<systemThread>.*,.*,.*</systemThread>#<systemThread>${C}, 0, 0</systemThread>#" $TESTMAC_CFG_FILE
+        elif [ $n == 8 ]; then
+            sed -i "s#<runThread>.*,.*,.*</runThread>#<runThread>${C}, 89, 0</runThread>#" $TESTMAC_CFG_FILE
+        elif [ $n == 9 ]; then
+            sed -i "s#<urllcThread>.*,.*,.*</urllcThread>#<urllcThread>${C}, 90, 0</urllcThread>#" $TESTMAC_CFG_FILE
+            break
+        else
+            break
+        fi
+        n=$((n+1))
+    done
+ }
+
+function install_flexran_pic {
+   # To enable running flexran from current directory
+   cp /usr/bin/flexran-pic-l1 .
+   cp /usr/bin/flexran-pic-l2 .
+   cp -r $FLEXRAN_L1_DIR/table .
+}
+
+function remove_flexran_pic {
+   rm flexran-pic-l1 
+   rm flexran-pic-l2 
+   rm -fr table 
+}
+
+function start_l1 {
+    echo -e "\nCRU: Start L1"
+
+    # Launch L1 process in background. 
+    # To get around L1 process exits as soon as its stdin is closed as a result of 
+    # runnning in background, redirect its stdin to a pipe. 
+    if [ -p  $L1_PIPE ]; then
+       rm $L1_PIPE
+    fi
+    mkfifo $L1_PIPE
+    tail -f $L1_PIPE | /usr/bin/flexran-run-pic 5G &
+    sleep 20    # 10sec is recommended by Intel, but we are generous.
+}
+
+function stop_l1 {
+    echo "exit" > $L1_PIPE
+    sleep 5     # Give time for output to fully drained
+}
+
+function start_testmac {
+    echo -e "\nCRU: Start TESTMAC"
+
+    # Launch Testmac process in background. Redirect stdin to a pipe.  See L1 note.
+    if [ -p  $L2_PIPE ]; then
+       rm $L2_PIPE
+    fi
+    mkfifo $L2_PIPE
+    tail -f $L2_PIPE| TESTFILE=$test_file  /usr/bin/flexran-run-pic 5G &
+    if [ "$test_file" == "none" ]; then
+        sleep 5
+        user_cmd="${usr1} ${usr2} ${usr3} ${usr4} ${usr5}"
+        echo "$user_cmd" > $L2_PIPE
+        echo -e "\nCRU: testmac user_cmd: " $user_cmd
+    fi
+}
+
+function stop_testmac {
+    echo "exit" > $L2_PIPE
+}
+
+function flush_testmac {
+    # Send harmless 'version' commands to flush its stdout.
+    while true;
+    do
+       sleep 2
+       echo "version" > $L2_PIPE
+    done
+}
+
+# Let's do works
+
+if [ -z "$WORKLOAD_CPUS" ]; then
+    exit_error "WORKLOAD_CPUS is not defined.  This must be defined to run flexran"
+else
+    echo "WORKLOAD_CPUS: $WORKLOAD_CPUS"
+fi
+if [ -z "$HK_CPUS" ]; then
+    exit_error "HK_CPUS is not defined.  This must be defined to run flexran"
+else
+    echo "HK_CPUS: $HK_CPUS"
+fi
+
+longopts="fec-mode:,test-file:,log-test:,usr1:,usr2:,usr3:,usr4:,usr5:"
+opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
+if [ $? -ne 0 ]; then
+    exit_error "Unrecognized option specified"
+fi
+eval set -- "$opts";
+echo -e "\nCRU: opts= " $opts
+while true; do
+    case "$1" in
+        --fec-mode)
+            shift;
+            fec_mode=$1
+            if [ "$fec_mode" != "hw" ] && [ "$fec_mode" != "sw" ]; then
+                echo "Invalid fec-mode:$1"
+                fec_mode="hw"
+            fi
+            shift;
+            ;;
+        --usr1)
+            # Ex:  --usr1='run' --usr2='2' --usr3='0' --usr4='5' --usr5='12001'
+            shift;
+            usr1=$1
+            shift;
+            ;;
+        --usr2)
+            shift;
+            usr2=$1
+            shift;
+            ;;
+        --usr3)
+            shift;
+            usr3=$1
+            shift;
+            ;;
+        --usr4)
+            shift;
+            usr4=$1
+            shift;
+            ;;
+        --usr5)
+            shift;
+            usr5=$1
+            shift;
+            ;;
+        --test-file)
+            # Example: test_file=/opt/flexran/tests/nr5g/fd/testmac_fd_mu0_5mhz.cfg
+            shift;
+            test_file=$1
+            echo "test-file=$test_file"
+            shift;
+            ;;
+        --log-test)
+            # applicable to post processing only
+            shift;
+            shift;
+            ;;
+        --)
+            shift;
+            break
+            ;;
+        *)
+            exit_error "Unsupport option $1"
+            break
+            ;;
+    esac
+done
+echo "\nCRU:Use fec-mode=$fec_mode"
+
+init_mount_fs
+set_fec_mode
+pin_cores
+install_flexran_pic
+date +%s.%N >begin.txt
+start_l1
+start_testmac
+# Poll for the result file to appear, 120sec max. 
+total_wait=0
+while [ $total_wait -le $FIRST_RESULT_WAIT_SEC ]
+do
+  if [ ! -f $FLEXRAN_RESULT_FILE ]; then
+     total_wait=$((total_wait+10))
+     sleep 10
+     echo -e "\nCRU: Waited for results $total_wait seconds"
+  else
+     break
+  fi
+done
+# Poll for completion 
+error_status="None"
+if [ $total_wait -ge $FIRST_RESULT_WAIT_SEC ]; then
+    echo -e "\nCRU: Timeout waiting for results"
+    error_status="Timeout"
+else
+    echo -e "\nCRU: Waiting for results to drain"
+    # Kick Testmac to flush its stdout until the completion verbiage comes out
+    flush_testmac &
+    ( tail -f -n0 $FLEXRAN_LOG_FILE & ) | grep -q "$COMPLETION_SIGNATURE"
+fi
+echo  -e "\nCRU: Finish, error:$error_status. Stop TESTMAC and L1"
+stop_testmac
+stop_l1
+date +%s.%N >end.txt
+remove_flexran_pic
+# Kill the subproceses e.g flush_testmac and anything else
+kill $(jobs -p)
+# That's all folks
+
+
