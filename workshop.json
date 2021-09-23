@@ -27,25 +27,6 @@
                "xz"
             ]
             }
-        },
-        {    
-	        "name": "flexran_src",
-	        "type": "manual",
-	        "manual_info": {
-		        "commands": [ 
-		            "curl  -o /opt/flexran-hello.sh http://perf1.perf.lab.eng.bos.redhat.com:9000/flexran-hello.sh"
-                ]
-	        }
-        },
-	    {
-	        "name": "flexran_bin",
-	        "type": "manual",
-	        "manual_info": {
-		        "commands": [ 
-		            "curl -o /opt/flexran-ls.sh http://perf1.perf.lab.eng.bos.redhat.com:9000/flexran-ls.sh"
-                ]
-	        }
         }
- 
     ]
 }
