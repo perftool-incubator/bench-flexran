@@ -1,0 +1,137 @@
+#!/usr/bin/perl
+## -*- mode: perl; indent-tabs-mode: nil; perl-indent-level: 4 -*-
+## vim: autoindent tabstop=4 shiftwidth=4 expandtab softtabstop=4 filetype=perl
+## crucible get metric --source flexran --type {UL, DL} --period <> --begin <> --end <> --breakout type
+
+use strict;
+use warnings;
+use JSON::XS;
+use Data::Dumper;
+use Getopt::Long;
+
+BEGIN {
+    if (!(exists $ENV{'TOOLBOX_HOME'} && -d "$ENV{'TOOLBOX_HOME'}/perl")) {
+	print "This script requires libraries that are provided by the toolbox project.\n";
+	print "Toolbox can be acquired from https://github.com/perftool-incubator/toolbox and\n";
+	print "then use 'export TOOLBOX_HOME=/path/to/toolbox' so that it can be located.\n";
+	exit 1;
+    }
+}
+use lib "$ENV{'TOOLBOX_HOME'}/perl";
+use toolbox::json;
+use toolbox::metrics;
+
+my $ignore;
+my %times;
+my $test_file_mode="";
+my $log_test;
+GetOptions ("test-file=s" => \$test_file_mode,
+            "fec-mode=s" => \$ignore,
+            "usr1=s" => \$ignore,
+            "usr2=s" => \$ignore,
+            "usr3=s" => \$ignore,
+            "usr4=s" => \$ignore,
+            "usr5=s" => \$ignore,
+            "log-test=s" => \$log_test
+            );
+
+#
+# Extract begin/end timestamps recorded by the flexran run.
+#
+foreach my $i (qw(begin end)) {
+    my $file = $i . ".txt";
+    open(FH, $file) || die "Could not open " . $file;
+    $times{$i} = int (<FH> * 1000);
+    close FH;
+}
+
+my $primary_metric = 'DL';
+my $metric_data_name;
+my %names = ();
+my $num_sample=0;
+my %ul_desc = ('source' => 'flexran', 'class' => 'count', 'type' => 'UL');
+my %dl_desc = ('source' => 'flexran', 'class' => 'count', 'type' => 'DL');
+my $desc_ref;
+my $result_file = "l1_mlog_stats.txt";
+my $match = 0;
+my %low_name  = ('type' => 'low latency');
+my %avg_name  = ('type' => 'avg latency');
+my %high_name = ('type' => 'high latency');
+
+(my $rc, my $fh) = open_read_text_file($result_file);
+if ($rc == 0 and defined $fh) {
+    my $num_sample = 0;
+
+    # A run may execute multiple tests. At this moment, only index FEC metrics of the
+    # designated test, specified by $log_test.
+
+    while (<$fh>) {
+        #  LATENCY_TASKNAME                         MIN  HIST_LOW       AVG  HIST_HIGH       MAX
+        #  GNB_DL_FEC_LINK       AVG (MU 0)     :  0.00     28.00     29.47      32.00     30.00
+        #  GNB_UL_FEC_LINK       AVG (MU 0)     :  0.00    160.00    160.46     162.00    160.00
+
+        # Skip until the log-test.
+        if ( $match == 0 ) {
+            if ( /$log_test/ ) {
+                $match = 1;
+                printf "Capture: %s\n", $_;
+            }
+            next;
+        }
+        if ( /GNB_DL_FEC_LINK *AVG/ || /GNB_UL_FEC_LINK *AVG/ ) {
+            my @latencies = split(/\s+/, $_);
+            if ( /GNB_UL_FEC_LINK *AVG/ ) {
+                $desc_ref = \%ul_desc;
+                printf "log: %s\n", $_;
+
+            } else {
+                $desc_ref = \%dl_desc;
+                printf "log: %s\n", $_;
+            }
+
+            my %s_low = ('begin' => $times{'begin'}, 'end' => $times{'end'}, 'value' => $latencies[7]);
+            my %s_avg = ('begin' => $times{'begin'}, 'end' => $times{'end'}, 'value' => $latencies[8]);
+            my %s_high = ('begin' => $times{'begin'}, 'end' => $times{'end'}, 'value' => $latencies[9]);
+
+            # Note, some tests have 0's FEC metrics. log_sample() rejects a sample with all 0's.
+
+            log_sample("flexran", $desc_ref, \%low_name, \%s_low);
+            log_sample("flexran", $desc_ref, \%avg_name, \%s_avg);
+            log_sample("flexran", $desc_ref, \%high_name, \%s_high);
+
+            $num_sample++;
+        }
+        if ( /Test:/ ) {
+            # The start of the next test. Skip it and the rest.
+            $match = 0 ;
+            $log_test = "EINVAL";
+            
+        }
+    } # while
+    close($fh);
+    printf "finishing_samples\n";
+    my $metric_data_name = finish_samples();
+    if ( $num_sample > 0 ) {
+        #my $metric_data_name = finish_samples();
+        # Associate the metrics with a benchmark-period (in this case "measurement")
+        my %sample;
+        my @periods;
+        my %period = ('name' => 'measurement');
+        $sample{'rickshaw-bench-metric'}{'schema'}{'version'} = "2021.04.12";
+        my @metric_files = ( $metric_data_name );
+        $period{'metric-files'} = \@metric_files;
+        push(@periods, \%period);
+        $sample{'periods'} = \@periods;
+        $sample{'primary-period'} = 'measurement';
+        $sample{'primary-metric'} = $primary_metric;
+        $rc = put_json_file("post-process-data.json", \%sample);
+        if ( $rc > 0 ) {
+            printf "flexran-post-process(): Could not write file post-process-data.json\n";
+            exit 1
+        }
+    }
+} else {
+    printf "flexran-post-process(): open_read_text_file() failed with return code %d for file %s\n", $rc, $result_file;
+    printf "Is the current directory for a flexran server (no result file)?\n";
+}
+# EOF

@@ -1,0 +1,42 @@
+{
+    "rickshaw-benchmark": {
+        "schema": {
+            "version": "2020.05.18"
+        }
+    },
+    "benchmark": "flexran",
+    "controller": {
+        "post-script": "%bench-dir%flexran-post-process"
+    },
+    "client": {
+        "files-from-controller": [
+            {
+                "src": "%bench-dir%/flexran-base",
+                "dest": "/usr/bin/"
+            },
+            {
+                "src": "%bench-dir%/flexran-runtime",
+                "dest": "/usr/bin/"
+            },
+            {
+                "src": "%bench-dir%/flexran-client",
+                "dest": "/usr/bin/"
+            },
+            {
+                "src": "%bench-dir%flexran-pic-l1",
+                "dest": "/usr/bin/"
+            },
+            {
+                "src": "%bench-dir%/flexran-pic-l2",
+                "dest": "/usr/bin/"
+            },
+            {
+                "src": "%bench-dir%/flexran-run-pic",
+                "dest": "/usr/bin/"
+            }
+         
+        ],
+        "runtime": "flexran-runtime",
+        "start": "flexran-client"
+    }
+}

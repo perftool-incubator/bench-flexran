@@ -1,0 +1,32 @@
+{
+    "workshop": {
+        "schema": {
+            "version": "2020.03.02"
+        }
+    },
+    "userenvs": [
+	    {
+	        "name": "default",
+	        "requirements": [
+                "dpdk_dependancies",
+                "flexran_src",
+                "flexran_bin"
+	        ]
+	    }
+    ],
+    "requirements": [
+	    {
+            "name": "dpdk_dependancies",
+            "type": "distro",
+            "distro_info": {
+            "packages": [
+               "numactl-devel",
+               "libhugetlbfs-devel",
+               "ethtool",
+               "net-tools",
+               "xz"
+            ]
+            }
+        }
+    ]
+}
