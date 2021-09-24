@@ -8,9 +8,7 @@
 	    {
 	        "name": "default",
 	        "requirements": [
-                "dpdk_dependancies",
-                "flexran_src",
-                "flexran_bin"
+                "dpdk_dependancies"
 	        ]
 	    }
     ],
