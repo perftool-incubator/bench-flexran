@@ -33,6 +33,10 @@
             {
                 "src": "%bench-dir%/flexran-run-pic",
                 "dest": "/usr/bin/"
+            },
+            {
+                "src": "%bench-dir%/flexran_env_vars.sh",
+                "dest": "/opt/"
             }
          
         ],
