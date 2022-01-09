@@ -11,8 +11,6 @@ elif [ "$MODE" != "5G" ]; then
 fi
 
 source /opt/flexran_env_vars.sh
-#bash ./configure_cfg_files.sh
-
 
 if [ -n "$TESTFILE" ]; then
     if [ "$TESTFILE" != "none" ]; then

@@ -48,8 +48,6 @@ function init_mount_fs {
     ln -s /tmp/opt/flexran /opt/flexran
     ln -s /tmp/opt/intel /opt/intel
     ln -s /tmp/opt/dpdk-20.11 /opt/dpdk-20.11
-    ln -s /tmp/opt/configure_cfg_files.sh /opt/configure_cfg_files.sh
-    ln -s /tmp/opt/flexran_env_vars.sh /opt/flexran_env_vars.sh
 }
 
 function set_fec_mode {
