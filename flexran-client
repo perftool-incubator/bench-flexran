@@ -34,6 +34,9 @@ FLEXRAN_MIN_WCPUS=9
 L1_CFG_FILE=$FLEXRAN_L1_DIR/phycfg_timer.xml
 TESTMAC_CFG_FILE=$FLEXRAN_L2_DIR/testmac_cfg.xml
 
+echo -e "\nCRU: Start env"
+env
+
 test_file="none"
 fec_mode="hw"
 user_cmd="version"
@@ -68,36 +71,36 @@ function pin_cores {
         exit_error "Not enough CPUS. Flexran requires $FLEXRAN_MIN_CPUS or more CPUs"
     fi
 
-    n=1
     IFS=","
 
+    for C in $HK_CPUS
+    do
+        # use 1 CPU for below 3 threads
+        sed -i "s#<systemThread>.*,.*,.*</systemThread>#<systemThread>${C}, 0, 0</systemThread>#" $L1_CFG_FILE
+        sed -i "s#<systemThread>.*,.*,.*</systemThread>#<systemThread>${C}, 0, 0</systemThread>#" $TESTMAC_CFG_FILE
+        sed -i "s#<runThread>.*,.*,.*</runThread>#<runThread>${C}, 89, 0</runThread>#" $TESTMAC_CFG_FILE
+        break
+    done
+
     # TBD: take NUMA locality into account
+    n=1
     for C in $WORKLOAD_CPUS
     do
+        # use 2 CPUs for below 3 threads
         if [ $n == 1 ]; then
-            sed -i "s#<systemThread>.*,.*,.*</systemThread>#<systemThread>${C}, 0, 0</systemThread>#" $L1_CFG_FILE
-        elif [ $n == 2 ]; then
             sed -i "s#<timerThread>.*,.*,.*</timerThread>#<timerThread>${C}, 6, 0</timerThread>#" $L1_CFG_FILE
-        elif [ $n == 3 ]; then
-            sed -i "s#<FpgaDriverCpuInfo>.*,.*,.*</FpgaDriverCpuInfo>#<FpgaDriverCpuInfo>${C}, 96, 0</FpgaDriverCpuInfo>#" $L1_CFG_FILE
-        elif [ $n == 4 ]; then
-            sed -i "s#<FrontHaulCpuInfo>.*,.*,*</FrontHaulCpuInfo>#<FrontHaulCpuInfo>${C}, 86, 0</FrontHaulCpuInfo>#" $L1_CFG_FILE
-        elif [ $n == 5 ]; then
             sed -i "s#<radioDpdkMaster>.*,.*,.*</radioDpdkMaster>#<radioDpdkMaster>${C}, 99, 0</radioDpdkMaster>#" $L1_CFG_FILE
-        elif [ $n == 6 ]; then
+        elif [ $n == 2 ]; then
             sed -i "s#<wlsRxThread>.*,.*,.*</wlsRxThread>#<wlsRxThread>${C}, 90, 0</wlsRxThread>#" $TESTMAC_CFG_FILE
-        elif [ $n == 7 ]; then
-            sed -i "s#<systemThread>.*,.*,.*</systemThread>#<systemThread>${C}, 0, 0</systemThread>#" $TESTMAC_CFG_FILE
-        elif [ $n == 8 ]; then
-            sed -i "s#<runThread>.*,.*,.*</runThread>#<runThread>${C}, 89, 0</runThread>#" $TESTMAC_CFG_FILE
-        elif [ $n == 9 ]; then
-            sed -i "s#<urllcThread>.*,.*,.*</urllcThread>#<urllcThread>${C}, 90, 0</urllcThread>#" $TESTMAC_CFG_FILE
             break
         else
             break
         fi
         n=$((n+1))
     done
+    # Include these 2 important files in the run artifacts
+    cp $L1_CFG_FILE .
+    cp $TESTMAC_CFG_FILE .
  }
 
 function install_flexran_pic {
