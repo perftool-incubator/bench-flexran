@@ -31,13 +31,17 @@ FLEXRAN_RESULT_FILE=l1_mlog_stats.txt
 FIRST_RESULT_WAIT_SEC=180
 COMPLETION_SIGNATURE="All Tests Completed"
 FLEXRAN_MIN_WCPUS=9
-L1_CFG_FILE=$FLEXRAN_L1_DIR/phycfg_timer.xml
-TESTMAC_CFG_FILE=$FLEXRAN_L2_DIR/testmac_cfg.xml
+
+export L1_CFG_FILE=$FLEXRAN_L1_DIR/phycfg_timer.xml
+export TESTMAC_CFG_FILE=$FLEXRAN_L2_DIR/testmac_cfg.xml
+L1_CFG_FILE_ORIG="${L1_CFG_FILE}.orig"
+TESTMAC_CFG_FILE_ORIG="${TESTMAC_CFG_FILE}.orig"
 
 echo -e "\nCRU: Start env"
 env
 
 test_file="none"
+final_test_file="none"
 fec_mode="hw"
 user_cmd="version"
 usr1=""
@@ -63,45 +67,7 @@ function set_fec_mode {
     else
         sed -i 's#<dpdkBasebandFecMode>.*</dpdkBasebandFecMode>#<dpdkBasebandFecMode>0</dpdkBasebandFecMode>#' $L1_CFG_FILE
     fi
- }
-
-function pin_cores {
-    # Example: WORKLOAD_CPUS=11,12,13,14,15
-    if [ $(echo "$WORKLOAD_CPUS" | awk -F "," '{print NF-1}') -lt $FLEXRAN_MIN_WCPUS ]; then
-        exit_error "Not enough CPUS. Flexran requires $FLEXRAN_MIN_CPUS or more CPUs"
-    fi
-
-    IFS=","
-
-    for C in $HK_CPUS
-    do
-        # use 1 CPU for below 3 threads
-        sed -i "s#<systemThread>.*,.*,.*</systemThread>#<systemThread>${C}, 0, 0</systemThread>#" $L1_CFG_FILE
-        sed -i "s#<systemThread>.*,.*,.*</systemThread>#<systemThread>${C}, 0, 0</systemThread>#" $TESTMAC_CFG_FILE
-        sed -i "s#<runThread>.*,.*,.*</runThread>#<runThread>${C}, 89, 0</runThread>#" $TESTMAC_CFG_FILE
-        break
-    done
-
-    # TBD: take NUMA locality into account
-    n=1
-    for C in $WORKLOAD_CPUS
-    do
-        # use 2 CPUs for below 3 threads
-        if [ $n == 1 ]; then
-            sed -i "s#<timerThread>.*,.*,.*</timerThread>#<timerThread>${C}, 6, 0</timerThread>#" $L1_CFG_FILE
-            sed -i "s#<radioDpdkMaster>.*,.*,.*</radioDpdkMaster>#<radioDpdkMaster>${C}, 99, 0</radioDpdkMaster>#" $L1_CFG_FILE
-        elif [ $n == 2 ]; then
-            sed -i "s#<wlsRxThread>.*,.*,.*</wlsRxThread>#<wlsRxThread>${C}, 90, 0</wlsRxThread>#" $TESTMAC_CFG_FILE
-            break
-        else
-            break
-        fi
-        n=$((n+1))
-    done
-    # Include these 2 important files in the run artifacts
-    cp $L1_CFG_FILE .
-    cp $TESTMAC_CFG_FILE .
- }
+}
 
 function install_flexran_pic {
    # To enable running flexran from current directory
@@ -143,7 +109,8 @@ function start_testmac {
        rm $L2_PIPE
     fi
     mkfifo $L2_PIPE
-    tail -f $L2_PIPE| TESTFILE=$test_file  /usr/bin/flexran-run-pic 5G &
+    tail -f $L2_PIPE| TESTFILE=$final_test_file  /usr/bin/flexran-run-pic 5G &
+
     if [ "$test_file" == "none" ]; then
         sleep 5
         user_cmd="${usr1} ${usr2} ${usr3} ${usr4} ${usr5}"
@@ -163,6 +130,33 @@ function flush_testmac {
        sleep 2
        echo "version" > $L2_PIPE
     done
+}
+
+function fixup_cfg_files {
+    # Fixup phytimer_cfg.xml and testmac_cfg.xml
+    # Fixup $test_file and output to $test_file.fixup
+
+    CFG_OPTION=""
+    # --nosibling --nohkcpus
+
+    if [ "$test_file" != "none" ]; then
+        # fixup 'setcore' and 'phystart'
+        final_test_file="${test_file}.fixup"
+        cp $test_file $final_test_file
+        python3 /usr/bin/autotest.py --testfile=$final_test_file $CFG_OPTIONS
+        # make a copy of each for result records
+        cp $test_file .
+        cp $final_test_file .
+    else
+        python3 /usr/bin/autotest.py $CFG_OPTIONS
+    fi
+
+    # make a copy of each for result records
+    cp $L1_CFG_FILE .
+    cp $TESTMAC_CFG_FILE .
+    cp $L1_CFG_FILE_ORIG .
+    cp $TESTMAC_CFG_FILE_ORIG .
+
 }
 
 # Let's do works
@@ -247,8 +241,19 @@ done
 echo "\nCRU:Use fec-mode=$fec_mode"
 
 init_mount_fs
+
+# If config files were used in the last run, restore them
+if [ -f $L1_CFG_FILE_ORIG ]
+then
+    cp $L1_CFG_FILE_ORIG  $L1_CFG_FILE
+    cp $TESTMAC_CFG_FILE_ORIG  $TESTMAC_CFG_FILE
+else
+    cp $L1_CFG_FILE  $L1_CFG_FILE_ORIG
+    cp $TESTMAC_CFG_FILE $TESTMAC_CFG_FILE_ORIG
+fi
+
 set_fec_mode
-pin_cores
+fixup_cfg_files
 install_flexran_pic
 date +%s.%N >begin.txt
 start_l1

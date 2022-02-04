@@ -37,6 +37,22 @@
             {
                 "src": "%bench-dir%/flexran_env_vars.sh",
                 "dest": "/opt/"
+            },
+            {
+                "src": "%bench-dir%/autotest.py",
+                "dest": "/usr/bin"
+            },
+            {
+                "src": "%bench-dir%/cpu.py",
+                "dest": "/usr/bin"
+            },
+            {
+                "src": "%bench-dir%/log.py",
+                "dest": "/usr/bin"
+            },
+            {
+                "src": "%bench-dir%/process_testfile.py",
+                "dest": "/usr/bin"
             }
          
         ],
