@@ -8,7 +8,8 @@
 	    {
 	        "name": "default",
 	        "requirements": [
-                "dpdk_dependancies"
+                "dpdk_dependancies",
+                "pyyaml"
 	        ]
 	    }
     ],
@@ -24,6 +25,16 @@
                "net-tools",
                "xz"
             ]
+            }
+        },
+        {
+            "name": "pyyaml",
+            "type": "manual",
+            "manual_info": {
+                "commands": [
+                    "if command -v pip3.9; then pip3.9 install pyyaml lxml; else echo 'pip3.9 not found'; fi",
+                    "if command -v pip3; then pip3 install pyyaml lxml; else echo 'pip3 not found'; fi"
+                ]
             }
         }
     ]
