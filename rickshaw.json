@@ -23,6 +23,14 @@
                 "dest": "/usr/bin/"
             },
             {
+                "src": "%bench-dir%/xran-client",
+                "dest": "/usr/bin/"
+            },
+            {
+                "src": "%bench-dir%/driver.sh",
+                "dest": "/usr/bin/"
+            },
+            {
                 "src": "%bench-dir%flexran-pic-l1",
                 "dest": "/usr/bin/"
             },
@@ -40,6 +48,10 @@
             },
             {
                 "src": "%bench-dir%/autotest.py",
+                "dest": "/usr/bin"
+            },
+            {
+                "src": "%bench-dir%/xautotest.py",
                 "dest": "/usr/bin"
             },
             {

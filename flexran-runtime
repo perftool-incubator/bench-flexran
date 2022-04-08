@@ -24,4 +24,4 @@ while true; do
 done
 
 #echo "$duration"
-echo 1200
+echo 12000
