@@ -157,7 +157,7 @@ function flush_testmac_func {
     # Send harmless 'version' commands to flush its stdout.
     flexran_get_run_status_func
     while [ $max_runtime -gt 0 ] && [ "$flexran_is_running" = 1  ]; do
-       echo -e "\nCRU: Wait for resuls to drain. $max_runtime seconds remained"
+       echo -e "\nCRU: Wait for results to drain. $max_runtime seconds remained"
        sleep 2
        echo "version" > $L2_PIPE
        max_runtime=$((max_runtime-2))
@@ -248,7 +248,7 @@ function fixup_cfg_files_func {
     fi
 
     # fix them
-    /usr/bin/xautotest.py "${args[@]}"
+    /usr/bin/autotest.py "${args[@]}"
     
     # Put copies of config files in run-dir for debug
     cp $l1_cfg .

@@ -49,6 +49,6 @@
  
         ],
         "runtime": "flexran-runtime",
-        "start": "xran-client"
+        "start": "flexran-client"
     }
 }
