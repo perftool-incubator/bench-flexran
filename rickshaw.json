@@ -19,7 +19,7 @@
                 "dest": "/usr/bin/"
             },
             {
-                "src": "%bench-dir%/xran-client",
+                "src": "%bench-dir%/flexran-client",
                 "dest": "/usr/bin/"
             },
             {
@@ -31,7 +31,7 @@
                 "dest": "/opt/"
             },
             {
-                "src": "%bench-dir%/xautotest.py",
+                "src": "%bench-dir%/autotest.py",
                 "dest": "/usr/bin"
             },
             {
