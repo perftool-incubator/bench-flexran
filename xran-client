@@ -11,43 +11,81 @@
 #   'user-cmd' mode:  Testmac exec's a user-provided command likely for a single test.
 #                     i.e "run 2 1 100 1001"
 #######################################################################################
-function init_mount_fs {
-    # Flexran S/W is ~100GB. In development, we host mount it. Now, link it to the desired filepaths.
-    ln -s /tmp/opt/flexran /opt/flexran
-    ln -s /tmp/opt/intel /opt/intel
-    ln -s /tmp/opt/dpdk-20.11 /opt/dpdk-20.11
+
+FLEXRAN_LOG_FILE=flexran-client.log
+FLEXRAN_ROOT=/opt/flexran
+FLEXRAN_NR=$FLEXRAN_ROOT//bin/nr5g/gnb
+L1_PIPE=/tmp/flexran
+L2_PIPE=/tmp/testmac
+FLEXRAN_RESULT_FILE=l1_mlog_stats.txt
+FIRST_RESULT_WAIT_SEC=120
+COMPLETION_SIGNATURE="All Tests Completed"
+FLEXRAN_TM_LOG_FILE=cru_flexran_l2.log
+
+### Data section
+error_status=""
+oru_cfg=None
+l1_cfg=None
+testmac_cfg=None
+oru_cfg=None
+test_file=None
+xran=false
+xran_devices=
+max_runtime=60
+flexran_is_running=1
+
+declare -A timer_cfg
+        timer_cfg[l1]=$FLEXRAN_NR/l1/phycfg_timer.xml
+        timer_cfg[testmac]=$FLEXRAN_NR/testmac/testmac_cfg.xml
+        timer_cfg[orucfg]=None
+
+declare -A xran_cfg
+        xran_cfg[l1]=$FLEXRAN_NR/l1/orancfg/sub3_mu0_20mhz_4x4/gnb/phycfg_xran.xml
+        xran_cfg[testmac]=$FLEXRAN_NR/testmac/testmac_cfg.xml
+        xran_cfg[orucfg]=$FLEXRAN_NR/l1/orancfg/sub3_mu0_20mhz_4x4/gnb/xrancfg_sub6_oru.xml
+
+### Functions section
+
+function flexran_main_func {
+    exec >$FLEXRAN_LOG_FILE
+    exec 2>&1
+
+    . /usr/bin/flexran-base || (echo "/usr/bin/flexran-base not found"; exit 1)
+    dump_runtime
+    validate_label
+    validate_sw_prereqs
+    flexran_first_half_func $@
 }
 
-function set_fec_mode {
+function init_mount_fs_func {
+    # Flexran S/W is ~100GB. In development, we host mount it. Now, link it to the desired filepaths.
+    if [ ! -L  /opt/flexran ]; then
+       ln -s /tmp/opt/flexran /opt/flexran
+       ln -s /tmp/opt/intel /opt/intel
+       ln -s /tmp/opt/dpdk-20.11 /opt/dpdk-20.11
+   fi
+}
+
+#
+# PCIDEVICE_INTEL_COM_INTEL_FEC_5G is an env var that the OPENess Operator 
+# provides the container with.
+#
+function set_fec_mode_func {
     if [ "$fec_mode" == "hw" ]; then
         if [ -z "$PCIDEVICE_INTEL_COM_INTEL_FEC_5G" ]; then
             exit_error "PCIDEVICE_INTEL_COM_INTEL_FEC_5G is not defined. This must be defined to run flexran HW FEC"
         fi
         sed -i "s#<dpdkBasebandDevice>.*</dpdkBasebandDevice>#<dpdkBasebandDevice>${PCIDEVICE_INTEL_COM_INTEL_FEC_5G}</dpdkBasebandDevice>#" $1
-        sed -i 's#<dpdkBasebandFecMode>.*</dpdkBasebandFecMode>#<dpdkBasebandFecMode>1</dpdkBasebandFecMode>#' $L1_CFG_FILE
+        sed -i 's#<dpdkBasebandFecMode>.*</dpdkBasebandFecMode>#<dpdkBasebandFecMode>1</dpdkBasebandFecMode>#' $1
     else
         sed -i 's#<dpdkBasebandFecMode>.*</dpdkBasebandFecMode>#<dpdkBasebandFecMode>0</dpdkBasebandFecMode>#' $1
     fi
 }
 
-
-
-FLEXROOT=/opt/flexran/bin/nr5g/gnb
-declare -A timer_cfg
-        timer_cfg[l1]=$FLEXROOT/l1/phycfg_timer.xml
-        timer_cfg[testmac]=$FLEXROOT/testmac/testmac_cfg.xml
-        timer_cfg[orucfg]=None
-
-declare -A xran_cfg
-        xran_cfg[l1]=$FLEXROOT/l1/orancfg/sub3_mu0_20mhz_4x4/gnb/phycfg_xran.xml
-        xran_cfg[testmac]=$FLEXROOT/testmac/testmac_cfg.xml
-        xran_cfg[orucfg]=$FLEXROOT/l1/orancfg/sub3_mu0_20mhz_4x4/gnb/xrancfg_sub6_oru.xml
-
-PCIDEVICE_OPENSHIFT_IO_INTELNICS0=0000:4b:02.0,0000:4b:02.1
-
-function start_l1_mode {
+function start_l1_func {
     xran=$1
-    echo -e "\nCRU: Start L1 xran=$xran"
+    echo -e "CRU: Start L1 xran=$xran"
+
     source /opt/flexran_env_vars.sh
 
     # Launch L1 process in background. 
@@ -57,13 +95,28 @@ function start_l1_mode {
        rm $L1_PIPE
     fi
     mkfifo $L1_PIPE
-    /usr/bin/driver.sh vfio
-    cd $(dirname $l1_cfg)
-    tail -f $L1_PIPE | ./l1.sh -oru &
+    pushd $(dirname $l1_cfg)
+
+    if [[ $xran = true ]]; then
+        /usr/bin/driver.sh vfio
+        opts="-oru"
+    else
+        opts="-e"
+
+    fi
+    echo "$(pwd) run: tail -f $L1_PIPE | ./l1.sh $opts &"
+    tail -f $L1_PIPE | ./l1.sh $opts 2>&1 | tee cru_flexran_l1.log  &
+    popd
     sleep 20    # 10sec is recommended by Intel, but we are generous.
 }
 
-function start_testmac_mode {
+function stop_l1_func {
+    echo -e "\nCRU: stop L1" 
+    echo "exit" > $L1_PIPE
+    sleep 5     # Give time for output to fully drained
+}
+
+function start_testmac_func {
     echo -e "\nCRU: Start TESTMAC xran=$1"
     source /opt/flexran_env_vars.sh
 
@@ -72,266 +125,437 @@ function start_testmac_mode {
        rm $L2_PIPE
     fi
     mkfifo $L2_PIPE
-    cd $(dirname $testmac_cfg)
-    tail -f $L2_PIPE| ./l2.sh --testfile=$final_test_file &
-
-    if [ "$test_file" == "none" ]; then
+    pushd $(dirname $testmac_cfg)
+    if [ "$test_file" == "None" ]; then
+        echo "run: tail -f $L2_PIPE| ./l2.sh &"
+        tail -f $L2_PIPE| ./l2.sh  2>&1 | tee cru_flexran_l2.log &
         sleep 5
         user_cmd="${usr1} ${usr2} ${usr3} ${usr4} ${usr5}"
         echo "$user_cmd" > $L2_PIPE
         echo -e "\nCRU: testmac user_cmd: " $user_cmd
+    else
+        echo "run: tail -f $L2_PIPE| ./l2.sh --testfile=$test_file &"
+        tail -f $L2_PIPE| ./l2.sh --testfile=$test_file 2>&1 | tee cru_flexran_l2.log &
+    fi
+    popd
+    # Wait for testmac to exist. Else the hurried caller may think it has died.
+    for i in {0..10}; do
+        if [ "$(pidof testmac)" == "" ]; then
+            sleep 1
+        else
+            break
+        fi
+    done
+}
+
+function stop_testmac_func {
+    echo -e "\nCRU: stop testmac" 
+    echo "exit" > $L2_PIPE
+}
+
+function flush_testmac_func {
+    # Send harmless 'version' commands to flush its stdout.
+    flexran_get_run_status_func
+    while [ $max_runtime -gt 0 ] && [ "$flexran_is_running" = 1  ]; do
+       echo -e "\nCRU: Wait for resuls to drain. $max_runtime seconds remained"
+       sleep 2
+       echo "version" > $L2_PIPE
+       max_runtime=$((max_runtime-2))
+       flexran_get_run_status_func
+    done
+
+    if [ $max_runtime -le 0 ]; then
+        error_status+=" Timeout waiting for completion signature"
     fi
 }
 
-# Function: fixup_cfg_files
-#  Timer mode: fix up below
-#    phycfg_timer: /opt/flexran/bin/nr5g/gnb/l1/
-#    testmac_cfg: /opt/flexran/bin/nr5g/gnb/testmac/
-#
-#  XRAN Mode: fix up belows
-#    phycfg_xran:      /opt/flexran/bin/nr5g/gnb/l1/orancfg/sub3_mu0_10mhz_4x4/gnb/
-#    xrancfg_sub6_oru: /opt/flexran/bin/nr5g/gnb/l1/orancfg/sub3_mu0_10mhz_4x4/gnb/
-#    testmac_cfg: /opt/flexran/bin/nr5g/gnb/testmac/
-#
-#    copy /opt/flexran/bin/nr5g/gnb/l1/orancfg/sub3_mu0_20mhz_4x4/gnb/testmac_clxsp_mu0_20mhz_hton_oru.cfg
-#         to /opt/flexran/bin/nr5g/gnb/testmac,
-#    and update this file:
-#        phystart: 4 0 100007
-#        setcore
-#
+function flexran_get_run_status_func {
 
-oru_cfg=None
-l1_cfg=None
-testmac_cfg=None
-oru_cfg=None
-test_file=None
+    testmac_pid=$(pidof testmac)
+    l1_pid=$(pidof l1app)
 
-# Init config file vars depending on xran or not.
-#   While at it, restore files to original state (previous run has modified them)
+    echo "CRU debug: $testmac_pid, $l1_pid"
+
+    if [ "$l1_pid" == ""  ] ; then
+          echo "CRU: flexran l1app has terminated"
+          error_status+=" l1app terminated unexpectedly"
+    fi
+    if [ "$testmac_pid"  == "" ]; then
+          echo "CRU: flexran testmac has terminated"
+          error_status+=" testmac terminated unexpectedly"
+    fi
+    if [ "$testmac_pid" != ""  ] && [ "$l1_pid" != "" ]; then
+        flexran_is_running=1
+    else
+        flexran_is_running=0
+    fi
+}
+
+
 #
-function init_cfgfile_vars {
+# Init config file "pointers" based on xran vs timer mode.
+#
+function init_cfgfile_vars_func {
     if [ $xran = true ]; then
         l1_cfg=${xran_cfg[l1]}
         testmac_cfg=${xran_cfg[testmac]}
         oru_cfg=${xran_cfg[orucfg]}
-
     else
         l1_cfg=${timer_cfg[l1]}
         testmac_cfg=${timer_cfg[testmac]}
     fi
 }
 
-function fixup_xran_cfg_files {
-    echo $l1_cfg
-    echo $testmac_cfg
-    echo $oru_cfg
+# Function: fixup_cfg_files_func
+#  Timer mode: fix below files
+#    phycfg_timer:      /opt/flexran/bin/nr5g/gnb/l1/phycfg_timer.xml
+#    testmac:           /opt/flexran/bin/nr5g/gnb/testmac/testmac_cfg.xml
+#
+#  XRAN Mode: fix below files
+#    phycfg_xran:       /opt/flexran/bin/nr5g/gnb/l1/orancfg/sub3_mu0_10mhz_4x4/gnb/phycfg_xran.xml
+#    xrancfg_sub6_oru:  /opt/flexran/bin/nr5g/gnb/l1/orancfg/sub3_mu0_10mhz_4x4/gnb/xrancfg_sub6_oru.xml
+#    testmac:           /opt/flexran/bin/nr5g/gnb/testmac/testmac_cfg.xml
+#   
+#    Then, copy testfile i.e ./l1/orancfg/sub3_mu0_20mhz_4x4/gnb/testmac_clxsp_mu0_20mhz_hton_oru.cfg
+#         to /opt/flexran/bin/nr5g/gnb/testmac,
+#    and fix params in testfile:
+#        phystart: 4 0 100007  <== 4: xran mode
+#        setcore <fix whatever here>
+#
+function fixup_cfg_files_func {
+    echo "l1_config: $l1_cfg"
+    echo "testmac_cfg: $testmac_cfg"
+    echo "oru_cfg: $oru_cfg"
+    echo "xran_devices: $xran_devices"
     # https://stackoverflow.com/questions/47886113/how-to-call-a-python-script-from-bash-with-arguments
      
-    echo "options=" $options
-
     args=( 
         --l1_cfgfile "${l1_cfg}"
         --testmac_cfgfile "${testmac_cfg}"
     )
-    if [ $xran = true ]; then
+    if [ $test_file != None ]; then
+        args+=(
+            --testfile "${test_file}"
+        )
+    fi
+    if [ $xran = true ]; then 
         echo "xran ON"
         args+=(
             --oru_cfgfile "${oru_cfg}"
-            --oru_vfs_pci "${PCIDEVICE_OPENSHIFT_IO_INTELNICS0}"
-            --testfile "${test_file}"
+            --oru_vfs_pci "${xran_devices}"
             --phystart 
         )
-    fi
-    if [ ! -z $options ]; then
-        IFS=' ' read -r -a array <<< "$options"
-        echo "array=" ${array[@]}
-        args+=(${array[@]})
-        echo "arg=" ${args[@]}
     fi
 
     # fix them
     /usr/bin/xautotest.py "${args[@]}"
     
-    # Put copies of config files in crucible run dirs
-    echo "cp $l1_cfg"
+    # Put copies of config files in run-dir for debug
     cp $l1_cfg .
-
-    echo "cp $testmac_cfg"
     cp $testmac_cfg .
-
-   echo "cp ${l1_cfg}.orig"
     cp "${l1_cfg}".orig .
-
-    echo "cp ${testmac}.orig"
-    cp "${testmac}".orig .
+    cp "${testmac_cfg}".orig .
     if [ $xran = true ]; then
-        echo "cp $oru_cfg"
         cp $oru_cfg .
-        echo  "${oru_cfg}.orig "
         cp "${oru_cfg}".orig .
     fi
     if [ $test_file != None ]; then
-        echo "cp $test_file"
         cp $test_file .
-        echo "cp ${test_file}.orig"
         cp "${test_file}".orig .
     fi
 
     # move file to the right destination for xran case
     if [ $xran = true ]; then
-        cp $test_file $FLEXROOT/testmac/
+        cp $test_file $FLEXRAN_NR/testmac/
         cp $test_file .
     fi
 }
 
-function restore_cfg_files {
-    # If config files were used in the last run, restore them
+function restore_cfg_files_func {
+    # If config files were fixed-up in the last run, restore them
+    echo "restore_cfg_files_func "
     if [ -f "${l1_cfg}".orig ]; then
-        echo "restore $l1_cfg $testmac_cfg"
         cp "${l1_cfg}".orig  $l1_cfg
         cp "${testmac_cfg}".orig  $testmac_cfg
     else
-        echo "save $l1_cfg, $testmac_cfg"
         cp $l1_cfg "${l1_cfg}".orig
         cp $testmac_cfg "${testmac_cfg}".orig
     fi
 
     if [ $oru_cfg != None ]; then
         if [ -f  "${oru_cfg}".orig  ];then
-            echo "restore $oru_cfg"
             cp "${oru_cfg}".orig  $oru_cfg
         else 
-            echo "save $oru_cfg"
             cp $oru_cfg  "${oru_cfg}".orig
         fi
     fi
 
     if [ -f "${test_file}".orig ]; then
-        echo "restore $oru_cfg"
         cp "${test_file}".orig  $test_file
     else
-        echo "save $oru_cfg"
         cp $test_file "${test_file}".orig
     fi
 }
 
-function xran_main {
 
-longopts="xran:,fec-mode:,test-file:,log-test:,usr1:,usr2:,usr3:,usr4:,usr5:"
-opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
-if [ $? -ne 0 ]; then
-    exit_error "Unrecognized option specified"
-fi
-eval set -- "$opts";
-echo -e "\nCRU: opts= " $opts
-while true; do
-    case "$1" in
-        --fec-mode)
-            shift;
-            fec_mode=$1
-            if [ "$fec_mode" != "hw" ] && [ "$fec_mode" != "sw" ]; then
-                echo "Invalid fec-mode:$1"
-                fec_mode="hw"
-            fi
-            shift;
-            ;;
-        --usr1)
-            # Ex:  --usr1='run' --usr2='2' --usr3='0' --usr4='5' --usr5='12001'
-            shift;
-            usr1=$1
-            shift;
-            ;;
-        --usr2)
-            shift;
-            usr2=$1
-            shift;
-            ;;
-        --usr3)
-            shift;
-            usr3=$1
-            shift;
-            ;;
-        --usr4)
-            shift;
-            usr4=$1
-            shift;
-            ;;
-        --usr5)
-            shift;
-            usr5=$1
-            shift;
-            ;;
-        --test-file)
-            # Example: test_file=/opt/flexran/tests/nr5g/fd/testmac_fd_mu0_5mhz.cfg
-            shift;
-            test_file=$1
-            echo "test-file=$test_file"
-            shift;
-            ;;
-        --log-test)
-            # applicable to post processing only
-            shift;
-            shift;
-            ;;
-        --xran)
-            shift;
-            xran=true
-            shift;
-            ;;
-        --)
-            shift;
-            break
-            ;;
-        *)
-            exit_error "Unsupport option $1"
-            break
-            ;;
-    esac
-done
-echo "\nCRU:Use fec-mode=$fec_mode"
-init_mount_fs
-init_cfgfile_vars
-restore_cfg_files
-set_fec_mode $l1_cfg
-fixup_xran_cfg_files
-#install_flexran_pic
-date +%s.%N >begin.txt
+# Function: flexran_first_half_func, flexran_second_half_func
+# Break whole function into two halves for debug convenience e.g.
+# "stand-alone" and "manual" mode
+#
+function flexran_first_half_func {
 
-echo "HN invoke l1 and testmac by hand"
-sleep infinity
+    echo -e "\nCRU: Start env: " $(env)
 
-start_l1_mode $xran
-start_testmac_mode $xran
-# Poll for the result file to appear, 120sec max. 
-total_wait=0
-while [ $total_wait -le $FIRST_RESULT_WAIT_SEC ]
-do
-  if [ ! -f $FLEXRAN_RESULT_FILE ]; then
-     total_wait=$((total_wait+10))
-     sleep 10
-     echo -e "\nCRU: Waited for results $total_wait seconds"
-  else
-     break
-  fi
-done
-# Poll for completion 
-error_status="None"
-if [ $total_wait -ge $FIRST_RESULT_WAIT_SEC ]; then
-    echo -e "\nCRU: Timeout waiting for results"
-    error_status="Timeout"
-else
-    echo -e "\nCRU: Waiting for results to drain"
-    # Kick Testmac to flush its stdout until the completion verbiage comes out
-    flush_testmac &
-    ( tail -f -n0 $FLEXRAN_LOG_FILE & ) | grep -q "$COMPLETION_SIGNATURE"
-fi
-echo  -e "\nCRU: Finish, error:$error_status. Stop TESTMAC and L1"
-stop_testmac
-stop_l1
-date +%s.%N >end.txt
-remove_flexran_pic
-# Kill the subproceses e.g flush_testmac and anything else
-kill $(jobs -p)
-# That's all folks
+    if [ -z "$WORKLOAD_CPUS" ]; then
+        exit_error "WORKLOAD_CPUS is not defined.  This must be defined to run flexran"
+    else
+        echo "WORKLOAD_CPUS: $WORKLOAD_CPUS"
+    fi
+    if [ -z "$HK_CPUS" ]; then
+    exit_error "HK_CPUS is not defined.  This must be defined to run flexran"
+    else
+        echo "HK_CPUS: $HK_CPUS"
+    fi
 
+    longopts="max-runtime:,xran-devices:,fec-mode:,test-file:,log-test:,usr1:,usr2:,usr3:,usr4:,usr5:"
+    opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
+    echo -e "\nCRU:flexran_first_half_func opts= " $opts
+    if [ $? -ne 0 ]; then
+        exit_error "Unrecognized option specified"
+    fi
+    eval set -- "$opts";
+    while true; do
+        case "$1" in
+            --fec-mode)
+                shift;
+                fec_mode=$1
+                if [ "$fec_mode" != "hw" ] && [ "$fec_mode" != "sw" ]; then
+                    echo "Invalid fec-mode:$1"
+                    fec_mode="hw"
+                fi
+                shift;
+                ;;
+            --usr1)
+                # Ex:  --usr1='run' --usr2='2' --usr3='0' --usr4='5' --usr5='12001'
+                shift;
+                usr1=$1
+                shift;
+                ;;
+            --usr2)
+                shift;
+                usr2=$1
+                shift;
+                ;;
+            --usr3)
+                shift;
+                usr3=$1
+                shift;
+                ;;
+            --usr4)
+                shift;
+                usr4=$1
+                shift;
+                ;;
+            --usr5)
+                shift;
+                usr5=$1
+                shift;
+                ;;
+            --test-file)
+                # Example: test_file=/opt/flexran/tests/nr5g/fd/testmac_fd_mu0_5mhz.cfg
+                shift;
+                test_file=$1
+                echo "test-file=$test_file"
+                shift;
+                ;;
+            --log-test)
+                # applicable to post processing only
+                shift;
+                shift;
+                ;;
+            --xran-devices)
+                shift;
+                xran_devices=$1
+                xran=true
+                #export PCIDEVICE_OPENSHIFT_IO_INTELNICS0=$1
+                shift;
+                ;;
+            --max-runtime)
+                # applicable to post processing only
+                shift;
+                max_runtime=$1
+                shift;
+                ;;
+            --)
+                shift;
+                break
+                ;;
+            *)
+                exit_error "Unsupport option $1"
+                break
+                ;;
+        esac
+    done
+    
+    if [[ $stand_alone = false ]]; then
+    	echo "\nCRU: Use fec-mode=$fec_mode"
+    	init_mount_fs_func
+    	init_cfgfile_vars_func
+    	restore_cfg_files_func
+    	set_fec_mode_func $l1_cfg
+    	fixup_cfg_files_func
+    	date +%s.%N >begin.txt
+   
+     	#echo "CRU: to be continued in standalone mode"
+    	#sleep infinity
+    else
+        echo "CRU: exec flexran_first_half_func in standalone"
+        init_cfgfile_vars_func
+    fi
+
+    flexran_second_half_func
 }
+
+function flexran_second_half_func {
+    echo "CRU: flexran_p1_func xran=$xran "
+    clear_run_dir_func
+
+    start_l1_func $xran
+    start_testmac_func $xran
+   
+    ps -ef
+    pushd $FLEXRAN_NR/l1
+
+    # Poll for the result file to appear on L1 side, 120sec max. 
+    flexran_get_run_status_func
+    total_wait=0
+    while [ $total_wait -le $FIRST_RESULT_WAIT_SEC ] && [ "$flexran_is_running" = 1 ]; do
+        if [ ! -f $FLEXRAN_RESULT_FILE ]; then
+            total_wait=$((total_wait+10))
+            sleep 10
+            echo -e "\nCRU: Results not yet detected at T+$total_wait seconds"
+            flexran_get_run_status_func
+        else
+            break
+        fi
+    done
+    popd
+
+    # We got here by either 1) All good 2) L1 or testmac died 3) timeout
+    if [ $total_wait -ge $FIRST_RESULT_WAIT_SEC ]; then
+        echo -e "\nCRU: Timeout waiting for first result"
+        error_status+=" Timeout waitng for first result to appear"
+    fi
+    
+    if [ "$error_status" == "" ]; then
+        # Poll for completion from testmac side
+        pushd $FLEXRAN_NR/testmac
+        echo -e "\nCRU: Waiting for results to drain"
+        # Kick Testmac to flush its stdout until the completion verbiage comes out
+        flush_testmac_func &
+        tail -f -n0 $FLEXRAN_TM_LOG_FILE | grep -q "$COMPLETION_SIGNATURE" &
+
+        # Wait for first background process exit
+        wait -n
+
+        if (  ps -p $! > /dev/null ); then 
+            # $! is the last background job which is "grep". If it has not finished, we did not complete.
+            error_status+=" Test did not complete"
+            # Update L1 and testmac status. We will show final status
+            flexran_get_run_status_func
+        fi
+        popd
+    fi
+    ps -ef
+
+    stop_testmac_func
+    stop_l1_func
+    date +%s.%N >end.txt
+
+    collect_run_output_func
+
+    # Kill background processes 
+    if [ "$(jobs -p)" != ""  ]; then
+        kill $(jobs -p)
+    fi
+
+    if [ "$error_status" != "" ]; then
+        echo  -e "\nCRU: Final, error messages: $error_status"
+        exit_error "$error_status"
+    else
+        echo  -e "\nCRU: Final, no errors"
+    fi
+
+    # That's all folks
+}
+
+#
+# Clear artifact from the last run if they're there
+#
+function clear_run_dir_func {
+    pushd $FLEXRAN_NR/l1
+    rm $FLEXRAN_RESULT_FILE
+    rm *.txt
+    popd
+    pushd $FLEXRAN_NR/testmac
+    rm Results.txt
+    rm *.txt
+    popd
+}
+
+#
+# Move this run's artifacts to ./iteration-n/sample-m filepath
+#
+function collect_run_output_func {
+    echo "CRU: collect_run_output_func"
+    if [ -f $FLEXRAN_NR/l1/$FLEXRAN_RESULT_FILE ]; then
+        cp $FLEXRAN_NR/l1/$FLEXRAN_RESULT_FILE .
+    fi
+    cp $FLEXRAN_NR/l1/*.txt .
+    cp $FLEXRAN_NR/testmac/Results.txt .
+
+    cp $(dirname $l1_cfg)/cru_flexran_l1.log .
+    cp $(dirname $testmac_cfg)/cru_flexran_l2.log .
+}
+
+function flexran_stdalone_func {
+    export  WORKLOAD_CPUS=4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,76,78,80,82,84,86,88,90,92,94,96,98,100,102,104
+    export  HK_CPUS=2,74
+    #export  PCIDEVICE_OPENSHIFT_IO_INTELNICS0=0000:4b:02.0,0000:4b:02.1
+
+    flexran_first_half_func $@
+}
+
+# Debug support: Standalone mode 
+# To run this script in stand-alone mode
+# Step 1: Uncomment "sleep infinity" in flexran_first_half_func
+# Step 2: Invoke run.sh from controller. First_half will stop at "sleep infinity"
+# Step 3: oc rsh richshaw-1
+# Step 4: Change to "stand_alone=true"
+# Step 5: bash <this_file> <all_the_args>  - See args in flexran-client.log
+#         This time it skips config fixup part and runs mostly the second_half.
+#         Repeat step 5 as many times as you want
+stand_alone=false
+
+if [ $stand_alone = false ]; then
+    flexran_main_func $@
+else
+    flexran_stdalone_func $@
+fi
+
+#
+# Debug support: Manual mode
+# After step 2 of "standalone" mode, we can also run manually.
+# Step 3: open a shell, oc rsh rickshaw-client-1
+# Step 4: open another shell, oc rsh rickshaw-client-1
+# Step 5: on first shell
+#       source /opt/flexran_env_vars.sh
+#       cd /opt/flexran/bin/nr5g/gnb/l1
+#       ./l1.sh -e
+# Step 6: on second shell
+#       source /opt/flexran_env_vars.sh
+#       cd /opt/flexran/bin/nr5g/gnb/testmac
+#       ./l2.sh 
+#           or
+#       ./l2.sh --testfile=testmac_clxsp_mu0_20mhz_hton_oru.cfg
+# EOF

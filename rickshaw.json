@@ -19,10 +19,6 @@
                 "dest": "/usr/bin/"
             },
             {
-                "src": "%bench-dir%/flexran-client",
-                "dest": "/usr/bin/"
-            },
-            {
                 "src": "%bench-dir%/xran-client",
                 "dest": "/usr/bin/"
             },
@@ -31,24 +27,8 @@
                 "dest": "/usr/bin/"
             },
             {
-                "src": "%bench-dir%flexran-pic-l1",
-                "dest": "/usr/bin/"
-            },
-            {
-                "src": "%bench-dir%/flexran-pic-l2",
-                "dest": "/usr/bin/"
-            },
-            {
-                "src": "%bench-dir%/flexran-run-pic",
-                "dest": "/usr/bin/"
-            },
-            {
                 "src": "%bench-dir%/flexran_env_vars.sh",
                 "dest": "/opt/"
-            },
-            {
-                "src": "%bench-dir%/autotest.py",
-                "dest": "/usr/bin"
             },
             {
                 "src": "%bench-dir%/xautotest.py",
@@ -66,9 +46,9 @@
                 "src": "%bench-dir%/process_testfile.py",
                 "dest": "/usr/bin"
             }
-         
+ 
         ],
         "runtime": "flexran-runtime",
-        "start": "flexran-client"
+        "start": "xran-client"
     }
 }
