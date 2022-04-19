@@ -6,7 +6,7 @@ import sys
 
 from log import logger 
 
-PHYSTART_QUICK_DEFAULT = 'phystart 4 0 100007'
+PHYSTART_QUICK_DEFAULT = 'phystart 4 0 100007\n'
 
 class ProcessTestfile:
 
@@ -21,6 +21,7 @@ class ProcessTestfile:
     def update_testfile(cls, rsc, testfile, phystart_quick):
         file_changed = False
         logger.info('Processing testfile:' + testfile)
+        logger.info('Processing phystart:' + str(phystart_quick))
         try:
             f = open(testfile, 'r')
             cfg = list(f)
