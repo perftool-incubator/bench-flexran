@@ -468,10 +468,15 @@ function flexran_second_half_func {
     fi
     ps -ef
 
-    stop_testmac_func
-    stop_l1_func
-    date +%s.%N >end.txt
+    
+    if [ "$(pidof testmac)" != "" ]; then
+        stop_testmac_func
+    fi
+    if [ "$(pidof l1app)" != "" ]; then
+        stop_l1_func
+    fi
 
+    date +%s.%N >end.txt
     collect_run_output_func
 
     # Kill background processes 

@@ -23,7 +23,8 @@
                "libhugetlbfs-devel",
                "ethtool",
                "net-tools",
-               "xz"
+               "xz",
+               "tmux"
             ]
             }
         },

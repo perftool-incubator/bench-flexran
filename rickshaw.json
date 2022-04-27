@@ -6,49 +6,35 @@
     },
     "benchmark": "flexran",
     "controller": {
+        "pre-script" : "%bench-dir%/flexran-setup-env",
         "post-script": "%bench-dir%flexran-post-process"
     },
     "client": {
         "files-from-controller": [
-            {
-                "src": "%bench-dir%/flexran-base",
-                "dest": "/usr/bin/"
-            },
-            {
-                "src": "%bench-dir%/flexran-runtime",
-                "dest": "/usr/bin/"
-            },
-            {
-                "src": "%bench-dir%/flexran-client",
-                "dest": "/usr/bin/"
-            },
-            {
-                "src": "%bench-dir%/driver.sh",
-                "dest": "/usr/bin/"
-            },
-            {
-                "src": "%bench-dir%/flexran_env_vars.sh",
-                "dest": "/opt/"
-            },
-            {
-                "src": "%bench-dir%/autotest.py",
-                "dest": "/usr/bin"
-            },
-            {
-                "src": "%bench-dir%/cpu.py",
-                "dest": "/usr/bin"
-            },
-            {
-                "src": "%bench-dir%/log.py",
-                "dest": "/usr/bin"
-            },
-            {
-                "src": "%bench-dir%/process_testfile.py",
-                "dest": "/usr/bin"
-            }
+            { "src": "%bench-dir%/flexran-base", "dest": "/usr/bin/" },
+            { "src": "%bench-dir%/flexran-runtime", "dest": "/usr/bin/" },
+            { "src": "%bench-dir%/flexran-client", "dest": "/usr/bin/" },
+            { "src": "%bench-dir%/driver.sh", "dest": "/usr/bin/" },
+            { "src": "%bench-dir%/flexran_env_vars.sh", "dest": "/opt/" },
+            { "src": "%bench-dir%/autotest.py", "dest": "/usr/bin" },
+            { "src": "%bench-dir%/cpu.py", "dest": "/usr/bin" },
+            { "src": "%bench-dir%/log.py", "dest": "/usr/bin" },
+            { "src": "%bench-dir%/process_testfile.py", "dest": "/usr/bin" }
  
         ],
         "runtime": "flexran-runtime",
         "start": "flexran-client"
+    },
+
+    "server": {
+        "files-from-controller": [
+            { "src": "%bench-dir%/flexran-base", "dest": "/usr/bin/" },
+            { "src": "%bench-dir%/flexran-server-start", "dest": "/usr/bin/" },
+            { "src": "%bench-dir%/flexran-server-stop", "dest": "/usr/bin/" },
+            { "src": "%run-dir%/cru", "dest": "/tmp/cru" }
+        ],
+        "start": "flexran-server-start",
+        "stop": "flexran-server-stop"
     }
+
 }
