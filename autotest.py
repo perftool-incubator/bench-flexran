@@ -18,6 +18,12 @@ class Setting:
 
     @classmethod
     def update_xran_cfg_files(cls, oru_cfgfile: str, vfs_pci, cpursc: CpuResource):
+        ''' Additional XRAN, xrancfg_sub6_oru.xml fix-up:
+            1) PciBusAddoRu0Vf0,PciBusAddoRu0Vf1: SRIOV VF pci address from "xran_devices" in mv-parrams.json
+               (which lspci the worker node after 07-sriov_operator_install.sh shows).
+            2) oRuRem0Mac1: remote RU's corresponding VF mac address : allocate a new cpu thread and put down the cpu id
+            3) xRANWorker: allocate a new cpu thread and put down the cpu mask
+        '''
         print ("Updating XRAN %s:" % oru_cfgfile);
         # Step 1: fix-up DU 2 VF PCIs
         #<PciBusAddoRu0Vf0>0000:1a:02.0</PciBusAddoRu0Vf0>
@@ -54,9 +60,39 @@ class Setting:
 
     @classmethod
     def update_cfg_files(cls, l1_cfg_file: str, testmac_cfg_file: str, cpursc: CpuResource):
+        '''
+        Both timer and XRAN uses this function to fix up config files. See flexran-client timer_cfg and xran_cfg.
+            l1_config_file: either phycfg_timer.xml or phycfg_xran.xml
+            testmac_cfg_file: testmac_cfg.xml for both timer and XRAN mode.
+        phycfg fix-up requirements:
+                1. DPDK/dpdkBasebandFecMode: 1 if using HW FEC
+                2. DPDK/dpdkBasebandDevice: HW FEC pci address based on value of env var PCIDEVICE_INTEL_COM_INTEL_FEC_ACC100
+        phycfg and testmac fix-up requirement:
+                3. Threads: pin flexran threads 
+
+        Requirement (1) and (2) are done outside by set_fec_mode_func() in flexran-client
+        This function does (3) using the below rules per Intel recommendation.
+            The 1st HK_CPU to be shared by those 3 threads.
+            The first WORKLOAD CPU is shared by those 2 threads
+            The second WORKLOAD CPU is used by wlsRxThread
+            (Note, the rest of the CPUs are used for the BBU threads per test 'setcore' specific )
+        For example:
+            HK_CPUS                 Threads                             File
+            ----------------------------------------------------------------------
+            1 (first) CPU   <systemThread>10, 0, 0</systemThread>   physcfg_timer.xml
+            1 (first) CPU   <systemThread>10, 0, 0</systemThread>   testmac_cfg.xml
+            1 (first) CPU   <runThread>10, 89, 0</runThread>        testmac_cfg.xml
+
+            WORLOAD_CPUS            Thread                              File 
+            ----------------------------------------------------------------------
+            1 (first) CPU   <timerThread>12, 6, 0</timerThread>         phycfg_timer.xml
+            1 (first) CPU   <radioDpdkMaster>12, 9, 0</radioDpdkMaster> phycfg_timer.xml
+            2(second) CPU   <wlsRxThread>14, 90, 0</wlsRxThread>        testmac_cfg.xml
+               
+        '''
         print ("Updating %s %s:" % (l1_cfg_file, testmac_cfg_file));
         
-        # First in list is the HK_CPUS, Use whole core for systemThreads abd RunThread
+        # First in list is the HK_CPUS, Use whole core for systemThreads and RunThread
         cpu = cpursc.allocate_whole_core()
         spec= "s#<systemThread>.*,.*,.*</systemThread>#<systemThread>CPU_NUM, 0, 0</systemThread>#"  
         result = re.sub("CPU_NUM", str(cpu), spec)
@@ -180,3 +216,4 @@ def main(name, argv):
 
 if __name__ == "__main__":
      main(sys.argv[0], sys.argv[1:])
+

@@ -1,0 +1,47 @@
+#!/bin/bash
+
+exec >flexran-server.log
+exec 2>&1
+
+. /usr/bin/flexran-base || (echo "/usr/bin/flexran-base not found"; exit 1)
+dump_runtime
+validate_label
+validate_sw_prereqs
+
+echo "enter flexran-server-start"
+echo "args; $@"
+
+xran_devices=""
+longopts="xran-devices:"
+opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
+if [ $? -ne 0 ]; then
+    exit_error "Unrecognized option specified"
+fi
+eval set -- "$opts";
+while true; do
+    case "$1" in
+    --xran-devices)
+        shift;
+        xran_devices=$1
+        #export PCIDEVICE_OPENSHIFT_IO_INTELNICS0=$1
+        shift;
+        ;;
+    --)
+        shift;
+        break
+        ;;
+    *)
+        exit_error "Unsupport option $1"
+        break
+        ;;
+    esac
+done
+
+if [ "$xran_devices" != "" ]; then    
+    log_file=$(realpath flexran-server.log)
+    pushd /tmp/script-dir 
+    ./09-ru_start.sh ${log_file}
+    popd 
+fi
+
+
