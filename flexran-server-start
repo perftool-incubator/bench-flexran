@@ -1,7 +1,12 @@
 #!/bin/bash
 
-exec >flexran-server-start-stderrout.txt
+exec >flexran-server.log
 exec 2>&1
+
+. /usr/bin/flexran-base || (echo "/usr/bin/flexran-base not found"; exit 1)
+dump_runtime
+validate_label
+validate_sw_prereqs
 
 echo "enter flexran-server-start"
 echo "args; $@"
@@ -32,9 +37,11 @@ while true; do
     esac
 done
 
-if [ $xran_devices != "" ]; then    
-    cd /tmp/cru
-    ./09-ru_start.sh
+if [ "$xran_devices" != "" ]; then    
+    log_file=$(realpath flexran-server.log)
+    pushd /tmp/script-dir 
+    ./09-ru_start.sh ${log_file}
+    popd 
 fi
 
 

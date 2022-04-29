@@ -1,5 +1,5 @@
 #!/bin/bash
-exec >flexran-server-stop-stderrout.txt
+exec >>flexran-server.log
 exec 2>&1
 
 echo "enter flexran-server-stop"
@@ -31,9 +31,14 @@ while true; do
     esac
 done
 
-if [ $xran_devices != "" ]; then    
-    cd /tmp/cru
+if [ "$xran_devices" != "" ]; then    
+    pushd /tmp/script-dir
     ./09-ru_stop.sh
+    source ./setting.env
+    popd
+    # collect artifacts
+    # TBD HN. decouple hardcoded $ORU_DIR
+    cp ${ORU_DIR}/{config*,run*,usecase*} .
 fi
 
 

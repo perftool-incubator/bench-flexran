@@ -14,7 +14,7 @@
 
 FLEXRAN_LOG_FILE=flexran-client.log
 FLEXRAN_ROOT=/opt/flexran
-FLEXRAN_NR=$FLEXRAN_ROOT//bin/nr5g/gnb
+FLEXRAN_NR=$FLEXRAN_ROOT/bin/nr5g/gnb
 L1_PIPE=/tmp/flexran
 L2_PIPE=/tmp/testmac
 FLEXRAN_RESULT_FILE=l1_mlog_stats.txt
@@ -104,8 +104,10 @@ function start_l1_func {
         opts="-e"
 
     fi
-    echo "$(pwd) run: tail -f $L1_PIPE | ./l1.sh $opts &"
-    tail -f $L1_PIPE | ./l1.sh $opts 2>&1 | tee cru_flexran_l1.log  &
+    pwd; ls -lt | tee cru_flexran_l1.log
+
+    echo "$(pwd) run: tail -f $L1_PIPE | ./l1.sh $opts &" | tee -a cru_flexran_l1.log
+    tail -f $L1_PIPE | ./l1.sh $opts 2>&1 | tee -a cru_flexran_l1.log  &
     popd
     sleep 20    # 10sec is recommended by Intel, but we are generous.
 }
@@ -126,16 +128,18 @@ function start_testmac_func {
     fi
     mkfifo $L2_PIPE
     pushd $(dirname $testmac_cfg)
+    pwd; ls -lt | tee cru_flexran_l2.log
+
     if [ "$test_file" == "None" ]; then
-        echo "run: tail -f $L2_PIPE| ./l2.sh &"
-        tail -f $L2_PIPE| ./l2.sh  2>&1 | tee cru_flexran_l2.log &
+        echo "run: tail -f $L2_PIPE| ./l2.sh &" | tee -a cru_flexran_l2.log
+        tail -f $L2_PIPE| ./l2.sh  2>&1 | tee -a cru_flexran_l2.log &
         sleep 5
         user_cmd="${usr1} ${usr2} ${usr3} ${usr4} ${usr5}"
         echo "$user_cmd" > $L2_PIPE
         echo -e "\nCRU: testmac user_cmd: " $user_cmd
     else
-        echo "run: tail -f $L2_PIPE| ./l2.sh --testfile=$test_file &"
-        tail -f $L2_PIPE| ./l2.sh --testfile=$test_file 2>&1 | tee cru_flexran_l2.log &
+        echo "run: tail -f $L2_PIPE | ./l2.sh --testfile=$test_file &" | tee -a cru_flexran_l2.log
+        tail -f $L2_PIPE| ./l2.sh --testfile=$test_file 2>&1 | tee -a cru_flexran_l2.log &
     fi
     popd
     # Wait for testmac to exist. Else the hurried caller may think it has died.
@@ -212,15 +216,15 @@ function init_cfgfile_vars_func {
 #    testmac:           /opt/flexran/bin/nr5g/gnb/testmac/testmac_cfg.xml
 #
 #  XRAN Mode: fix below files
-#    phycfg_xran:       /opt/flexran/bin/nr5g/gnb/l1/orancfg/sub3_mu0_10mhz_4x4/gnb/phycfg_xran.xml
-#    xrancfg_sub6_oru:  /opt/flexran/bin/nr5g/gnb/l1/orancfg/sub3_mu0_10mhz_4x4/gnb/xrancfg_sub6_oru.xml
+#    phycfg_xran:       /opt/flexran/bin/nr5g/gnb/l1/orancfg/sub3_mu0_20mhz_4x4/gnb/phycfg_xran.xml
+#    xrancfg_sub6_oru:  /opt/flexran/bin/nr5g/gnb/l1/orancfg/sub3_mu0_20mhz_4x4/gnb/xrancfg_sub6_oru.xml
 #    testmac:           /opt/flexran/bin/nr5g/gnb/testmac/testmac_cfg.xml
 #   
 #    Then, copy testfile i.e ./l1/orancfg/sub3_mu0_20mhz_4x4/gnb/testmac_clxsp_mu0_20mhz_hton_oru.cfg
 #         to /opt/flexran/bin/nr5g/gnb/testmac,
 #    and fix params in testfile:
 #        phystart: 4 0 100007  <== 4: xran mode
-#        setcore <fix whatever here>
+#        setcore <fix whatever there>
 #
 function fixup_cfg_files_func {
     echo "l1_config: $l1_cfg"
@@ -501,10 +505,12 @@ function clear_run_dir_func {
     pushd $FLEXRAN_NR/l1
     rm $FLEXRAN_RESULT_FILE
     rm *.txt
+    rm PhyStat* l1mlog* *.log $FLEXRAN_RESULT_FILE
     popd
     pushd $FLEXRAN_NR/testmac
     rm Results.txt
     rm *.txt
+    rm *.log testmac-mlog*
     popd
 }
 

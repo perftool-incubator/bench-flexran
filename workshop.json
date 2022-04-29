@@ -24,7 +24,8 @@
                "ethtool",
                "net-tools",
                "xz",
-               "tmux"
+               "tmux",
+               "linuxptp"
             ]
             }
         },

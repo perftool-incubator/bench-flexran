@@ -31,7 +31,7 @@
             { "src": "%bench-dir%/flexran-base", "dest": "/usr/bin/" },
             { "src": "%bench-dir%/flexran-server-start", "dest": "/usr/bin/" },
             { "src": "%bench-dir%/flexran-server-stop", "dest": "/usr/bin/" },
-            { "src": "%run-dir%/cru", "dest": "/tmp/cru" }
+            { "src": "%bench-dir%/script-dir", "dest": "/tmp/script-dir" }
         ],
         "start": "flexran-server-start",
         "stop": "flexran-server-stop"

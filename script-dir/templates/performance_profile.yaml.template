@@ -1,0 +1,18 @@
+apiVersion: performance.openshift.io/v1alpha1
+kind: PerformanceProfile
+metadata:
+  name: cnv-sriov-profile 
+spec:
+  cpu:
+    isolated: "${DU_ISOLATED_CPUS}"
+    reserved: "${DU_RESERVED_CPUS}"
+  hugepages:
+    defaultHugepagesSize: "1G"
+    pages:
+    - size: "1G"
+      count: 16 
+  realTimeKernel:
+    enabled: true 
+  nodeSelector:
+    node-role.kubernetes.io/${MCP}: "" 
+
