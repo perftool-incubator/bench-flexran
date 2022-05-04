@@ -24,7 +24,6 @@ FLEXRAN_TM_LOG_FILE=cru_flexran_l2.log
 
 ### Data section
 error_status=""
-oru_cfg=None
 l1_cfg=None
 testmac_cfg=None
 oru_cfg=None
@@ -280,9 +279,13 @@ function restore_cfg_files_func {
     echo "restore_cfg_files_func "
     if [ -f "${l1_cfg}".orig ]; then
         cp "${l1_cfg}".orig  $l1_cfg
-        cp "${testmac_cfg}".orig  $testmac_cfg
     else
         cp $l1_cfg "${l1_cfg}".orig
+    fi
+
+    if [ -f "${testmac_cfg}".orig ]; then
+        cp "${testmac_cfg}".orig  $testmac_cfg
+    else
         cp $testmac_cfg "${testmac_cfg}".orig
     fi
 
@@ -293,7 +296,6 @@ function restore_cfg_files_func {
             cp $oru_cfg  "${oru_cfg}".orig
         fi
     fi
-
     if [ -f "${test_file}".orig ]; then
         cp "${test_file}".orig  $test_file
     else
@@ -453,23 +455,28 @@ function flexran_second_half_func {
     
     if [ "$error_status" == "" ]; then
         # Poll for completion from testmac side
-        pushd $FLEXRAN_NR/testmac
-        echo -e "\nCRU: Waiting for results to drain"
-        # Kick Testmac to flush its stdout until the completion verbiage comes out
-        flush_testmac_func &
-        tail -f -n0 $FLEXRAN_TM_LOG_FILE | grep -q "$COMPLETION_SIGNATURE" &
+        # Sometime due to buffered I/O, test has completed when we got here. Grep full log before grep -f .
+        if ! grep -Fq "$COMPLETION_SIGNATURE" $FLEXRAN_LOG_FILE; then
+            # Not complete yet. Keep watching
+            pushd $FLEXRAN_NR/testmac
+            echo -e "\nCRU: Waiting for results to drain"
+            # Kick Testmac to flush its stdout until the completion verbiage comes out
+            flush_testmac_func &
+            tail -f -n0 $FLEXRAN_TM_LOG_FILE | grep -q "$COMPLETION_SIGNATURE" &
 
-        # Wait for first background process exit
-        wait -n
+            # Wait for first background process exit
+            wait -n
 
-        if (  ps -p $! > /dev/null ); then 
-            # $! is the last background job which is "grep". If it has not finished, we did not complete.
-            error_status+=" Test did not complete"
-            # Update L1 and testmac status. We will show final status
-            flexran_get_run_status_func
+            if (  ps -p $! > /dev/null ); then 
+                # $! is the last background job which is "grep". If it has not finished, we did not complete.
+                error_status+=" Test did not complete"
+                # Update L1 and testmac status. We will show final status
+                flexran_get_run_status_func
+            fi
+            popd
         fi
-        popd
     fi
+
     ps -ef
 
     
