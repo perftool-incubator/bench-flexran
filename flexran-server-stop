@@ -1,0 +1,44 @@
+#!/bin/bash
+exec >>flexran-server.log
+exec 2>&1
+
+echo "enter flexran-server-stop"
+echo "args; $@"
+
+xran_devices=""
+longopts="xran-devices:"
+opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
+if [ $? -ne 0 ]; then
+    exit_error "Unrecognized option specified"
+fi
+eval set -- "$opts";
+while true; do
+    case "$1" in
+    --xran-devices)
+        shift;
+        xran_devices=$1
+        #export PCIDEVICE_OPENSHIFT_IO_INTELNICS0=$1
+        shift;
+        ;;
+    --)
+        shift;
+        break
+        ;;
+    *)
+        exit_error "Unsupport option $1"
+        break
+        ;;
+    esac
+done
+
+if [ "$xran_devices" != "" ]; then    
+    pushd /tmp/script-dir
+    ./09-ru_stop.sh
+    source ./setting.env
+    popd
+    # collect artifacts
+    # TBD HN. decouple hardcoded $ORU_DIR
+    cp ${ORU_DIR}/{config*,run*,usecase*} .
+fi
+
+

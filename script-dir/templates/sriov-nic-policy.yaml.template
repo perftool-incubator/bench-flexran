@@ -1,0 +1,20 @@
+---
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: policy-intel-west
+  namespace: openshift-sriov-network-operator
+spec:
+  resourceName: intelnics0
+  nodeSelector:
+    feature.node.kubernetes.io/network-sriov.capable: "true"
+  priority: 5
+  mtu: 9000
+  numVfs: 2
+  nicSelector:
+    rootDevices:
+    - "${DU_SRIOV_INTERFACE_PCI}"
+    pfNames:
+    - "${DU_SRIOV_INTERFACE}" 
+  deviceType: vfio-pci
+  #deviceType: netdevice

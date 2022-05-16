@@ -14,7 +14,7 @@
 
 FLEXRAN_LOG_FILE=flexran-client.log
 FLEXRAN_ROOT=/opt/flexran
-FLEXRAN_NR=$FLEXRAN_ROOT//bin/nr5g/gnb
+FLEXRAN_NR=$FLEXRAN_ROOT/bin/nr5g/gnb
 L1_PIPE=/tmp/flexran
 L2_PIPE=/tmp/testmac
 FLEXRAN_RESULT_FILE=l1_mlog_stats.txt
@@ -24,7 +24,6 @@ FLEXRAN_TM_LOG_FILE=cru_flexran_l2.log
 
 ### Data section
 error_status=""
-oru_cfg=None
 l1_cfg=None
 testmac_cfg=None
 oru_cfg=None
@@ -104,8 +103,10 @@ function start_l1_func {
         opts="-e"
 
     fi
-    echo "$(pwd) run: tail -f $L1_PIPE | ./l1.sh $opts &"
-    tail -f $L1_PIPE | ./l1.sh $opts 2>&1 | tee cru_flexran_l1.log  &
+    pwd; ls -lt | tee cru_flexran_l1.log
+
+    echo "$(pwd) run: tail -f $L1_PIPE | ./l1.sh $opts &" | tee -a cru_flexran_l1.log
+    tail -f $L1_PIPE | ./l1.sh $opts 2>&1 | tee -a cru_flexran_l1.log  &
     popd
     sleep 20    # 10sec is recommended by Intel, but we are generous.
 }
@@ -126,16 +127,18 @@ function start_testmac_func {
     fi
     mkfifo $L2_PIPE
     pushd $(dirname $testmac_cfg)
+    pwd; ls -lt | tee cru_flexran_l2.log
+
     if [ "$test_file" == "None" ]; then
-        echo "run: tail -f $L2_PIPE| ./l2.sh &"
-        tail -f $L2_PIPE| ./l2.sh  2>&1 | tee cru_flexran_l2.log &
+        echo "run: tail -f $L2_PIPE| ./l2.sh &" | tee -a cru_flexran_l2.log
+        tail -f $L2_PIPE| ./l2.sh  2>&1 | tee -a cru_flexran_l2.log &
         sleep 5
         user_cmd="${usr1} ${usr2} ${usr3} ${usr4} ${usr5}"
         echo "$user_cmd" > $L2_PIPE
         echo -e "\nCRU: testmac user_cmd: " $user_cmd
     else
-        echo "run: tail -f $L2_PIPE| ./l2.sh --testfile=$test_file &"
-        tail -f $L2_PIPE| ./l2.sh --testfile=$test_file 2>&1 | tee cru_flexran_l2.log &
+        echo "run: tail -f $L2_PIPE | ./l2.sh --testfile=$test_file &" | tee -a cru_flexran_l2.log
+        tail -f $L2_PIPE| ./l2.sh --testfile=$test_file 2>&1 | tee -a cru_flexran_l2.log &
     fi
     popd
     # Wait for testmac to exist. Else the hurried caller may think it has died.
@@ -212,15 +215,15 @@ function init_cfgfile_vars_func {
 #    testmac:           /opt/flexran/bin/nr5g/gnb/testmac/testmac_cfg.xml
 #
 #  XRAN Mode: fix below files
-#    phycfg_xran:       /opt/flexran/bin/nr5g/gnb/l1/orancfg/sub3_mu0_10mhz_4x4/gnb/phycfg_xran.xml
-#    xrancfg_sub6_oru:  /opt/flexran/bin/nr5g/gnb/l1/orancfg/sub3_mu0_10mhz_4x4/gnb/xrancfg_sub6_oru.xml
+#    phycfg_xran:       /opt/flexran/bin/nr5g/gnb/l1/orancfg/sub3_mu0_20mhz_4x4/gnb/phycfg_xran.xml
+#    xrancfg_sub6_oru:  /opt/flexran/bin/nr5g/gnb/l1/orancfg/sub3_mu0_20mhz_4x4/gnb/xrancfg_sub6_oru.xml
 #    testmac:           /opt/flexran/bin/nr5g/gnb/testmac/testmac_cfg.xml
 #   
 #    Then, copy testfile i.e ./l1/orancfg/sub3_mu0_20mhz_4x4/gnb/testmac_clxsp_mu0_20mhz_hton_oru.cfg
 #         to /opt/flexran/bin/nr5g/gnb/testmac,
 #    and fix params in testfile:
 #        phystart: 4 0 100007  <== 4: xran mode
-#        setcore <fix whatever here>
+#        setcore <fix whatever there>
 #
 function fixup_cfg_files_func {
     echo "l1_config: $l1_cfg"
@@ -276,9 +279,13 @@ function restore_cfg_files_func {
     echo "restore_cfg_files_func "
     if [ -f "${l1_cfg}".orig ]; then
         cp "${l1_cfg}".orig  $l1_cfg
-        cp "${testmac_cfg}".orig  $testmac_cfg
     else
         cp $l1_cfg "${l1_cfg}".orig
+    fi
+
+    if [ -f "${testmac_cfg}".orig ]; then
+        cp "${testmac_cfg}".orig  $testmac_cfg
+    else
         cp $testmac_cfg "${testmac_cfg}".orig
     fi
 
@@ -289,7 +296,6 @@ function restore_cfg_files_func {
             cp $oru_cfg  "${oru_cfg}".orig
         fi
     fi
-
     if [ -f "${test_file}".orig ]; then
         cp "${test_file}".orig  $test_file
     else
@@ -449,29 +455,39 @@ function flexran_second_half_func {
     
     if [ "$error_status" == "" ]; then
         # Poll for completion from testmac side
-        pushd $FLEXRAN_NR/testmac
-        echo -e "\nCRU: Waiting for results to drain"
-        # Kick Testmac to flush its stdout until the completion verbiage comes out
-        flush_testmac_func &
-        tail -f -n0 $FLEXRAN_TM_LOG_FILE | grep -q "$COMPLETION_SIGNATURE" &
+        # Sometime due to buffered I/O, test has completed when we got here. Grep full log before grep -f .
+        if ! grep -Fq "$COMPLETION_SIGNATURE" $FLEXRAN_LOG_FILE; then
+            # Not complete yet. Keep watching
+            pushd $FLEXRAN_NR/testmac
+            echo -e "\nCRU: Waiting for results to drain"
+            # Kick Testmac to flush its stdout until the completion verbiage comes out
+            flush_testmac_func &
+            tail -f -n0 $FLEXRAN_TM_LOG_FILE | grep -q "$COMPLETION_SIGNATURE" &
 
-        # Wait for first background process exit
-        wait -n
+            # Wait for first background process exit
+            wait -n
 
-        if (  ps -p $! > /dev/null ); then 
-            # $! is the last background job which is "grep". If it has not finished, we did not complete.
-            error_status+=" Test did not complete"
-            # Update L1 and testmac status. We will show final status
-            flexran_get_run_status_func
+            if (  ps -p $! > /dev/null ); then 
+                # $! is the last background job which is "grep". If it has not finished, we did not complete.
+                error_status+=" Test did not complete"
+                # Update L1 and testmac status. We will show final status
+                flexran_get_run_status_func
+            fi
+            popd
         fi
-        popd
     fi
+
     ps -ef
 
-    stop_testmac_func
-    stop_l1_func
-    date +%s.%N >end.txt
+    
+    if [ "$(pidof testmac)" != "" ]; then
+        stop_testmac_func
+    fi
+    if [ "$(pidof l1app)" != "" ]; then
+        stop_l1_func
+    fi
 
+    date +%s.%N >end.txt
     collect_run_output_func
 
     # Kill background processes 
@@ -496,10 +512,12 @@ function clear_run_dir_func {
     pushd $FLEXRAN_NR/l1
     rm $FLEXRAN_RESULT_FILE
     rm *.txt
+    rm PhyStat* l1mlog* *.log $FLEXRAN_RESULT_FILE
     popd
     pushd $FLEXRAN_NR/testmac
     rm Results.txt
     rm *.txt
+    rm *.log testmac-mlog*
     popd
 }
 

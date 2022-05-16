@@ -1,0 +1,53 @@
+#!/bin/bash
+# -*- mode: sh; indent-tabs-mode: nil; sh-basic-offset: 4 -*-
+# vim: autoindent tabstop=4 shiftwidth=4 expandtab softtabstop=4 filetype=bash
+
+# This function copy the whole support directory from $script-dir under the filepath
+# where run.sh started to $run-dir/$scrip-dir. The $script-dir contains crucible-agnostic scripts 
+# for flexran. It expects that rickshaw.json will copy $run-dir/$script-dir to the engine(s)
+#
+# Relates:
+#   mv-params.json:   { "arg": "script-dir", "vals": ["flexran-clone/cru"] }
+#
+# Source: CWD/$script-dir
+# Destination: $run-dir/$script-dir
+
+echo "HN pre-script script-dir $@"
+
+script_dir=""
+
+while [ ! -z $1 ]; do
+    # TODO: support --arg val
+    arg=`echo $1 | awk -F= '{print $1}'`
+    if [ "$arg" == "--script-dir" ]; then
+        script_dir="`echo $1 | awk -F= '{print $2}'`"
+        echo "Found script-dir argument = ${script_dir}"
+    else
+        echo "Ignoring this script_dir argument: $arg"
+    fi
+    shift
+done
+
+#if a --script_dir presents  do it
+script_path=""
+if [ -n "${script_dir}" ]; then
+    if [ -n "${CRUCIBLE_HOSTFS_PWD}" ]; then
+        echo "Using CRUCIBLE_HOSTFS_PWD=${CRUCIBLE_HOSTFS_PWD}"
+        script_path+="/hostfs"
+        script_path+=${CRUCIBLE_HOSTFS_PWD}
+        script_path+="/"
+    fi
+    script_path+=${script_dir}
+
+    if [ ! -d ${script_path} ]; then
+        echo "ERROR: Could not find [${script_path}]"
+        exit 1
+    else
+        echo "Copying dir ${script_path} to $(basename -- $script_dir)"
+        /bin/cp -r "${script_path}" "$(basename -- $script_dir)"
+        exit 0
+    fi
+fi
+
+echo "HN pre-script no script-dir $@"
+# Do nothing when there is no --script-dir parameter
