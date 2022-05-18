@@ -18,7 +18,7 @@ FLEXRAN_NR=$FLEXRAN_ROOT/bin/nr5g/gnb
 L1_PIPE=/tmp/flexran
 L2_PIPE=/tmp/testmac
 FLEXRAN_RESULT_FILE=l1_mlog_stats.txt
-FIRST_RESULT_WAIT_SEC=120
+FIRST_RESULT_WAIT_SEC=300
 COMPLETION_SIGNATURE="All Tests Completed"
 FLEXRAN_TM_LOG_FILE=cru_flexran_l2.log
 
@@ -83,7 +83,7 @@ function set_fec_mode_func {
 
 function start_l1_func {
     xran=$1
-    echo -e "CRU: Start L1 xran=$xran"
+    echo -e "CRU: $(date +%H:%M:%S) Start L1 xran=$xran"
 
     source /opt/flexran_env_vars.sh
 
@@ -96,8 +96,9 @@ function start_l1_func {
     mkfifo $L1_PIPE
     pushd $(dirname $l1_cfg)
 
-    if [[ $xran = true ]]; then
+    if [ $xran = true ]; then
         /usr/bin/driver.sh vfio
+        sleep 3  # there was a time when l1.sh complained that the device is not under vfio. Maybe delay is needed.
         opts="-oru"
     else
         opts="-e"
@@ -118,7 +119,7 @@ function stop_l1_func {
 }
 
 function start_testmac_func {
-    echo -e "\nCRU: Start TESTMAC xran=$1"
+    echo -e "\nCRU: $(date +%H:%M:%S) Start TESTMAC xran=$1"
     source /opt/flexran_env_vars.sh
 
     # Launch Testmac process in background. Redirect stdin to a pipe.  See L1 note.
@@ -137,6 +138,9 @@ function start_testmac_func {
         echo "$user_cmd" > $L2_PIPE
         echo -e "\nCRU: testmac user_cmd: " $user_cmd
     else
+        if [ $xran = true ]; then
+            test_file=$(basename "${test_file}")
+        fi
         echo "run: tail -f $L2_PIPE | ./l2.sh --testfile=$test_file &" | tee -a cru_flexran_l2.log
         tail -f $L2_PIPE| ./l2.sh --testfile=$test_file 2>&1 | tee -a cru_flexran_l2.log &
     fi
@@ -449,7 +453,7 @@ function flexran_second_half_func {
 
     # We got here by either 1) All good 2) L1 or testmac died 3) timeout
     if [ $total_wait -ge $FIRST_RESULT_WAIT_SEC ]; then
-        echo -e "\nCRU: Timeout waiting for first result"
+        echo -e "\nCRU: $(date +%H:%M:%S) Timeout waiting for first result"
         error_status+=" Timeout waitng for first result to appear"
     fi
     

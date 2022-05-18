@@ -79,7 +79,7 @@ ru_cmd="cd ${FLEXRAN_DIR}; source ./set_env_var.sh -d; cd ${ORU_DIR}; ./run_o_ru
 
 tmux kill-session -t ru 2>/dev/null || true
 sleep 1
-tmux new-session -s ru -d "${ru_cmd} |& tee -a ${FLEXRAN_RU_LOG}" 
+tmux new-session -s ru -d "${ru_cmd} 2>&1 | tee -a ${FLEXRAN_RU_LOG}"
 sleep 1
 if ! tmux ls | grep ru; then
     echo "failed to start ru"

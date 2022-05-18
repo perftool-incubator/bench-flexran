@@ -2,6 +2,7 @@
 ## -*- mode: perl; indent-tabs-mode: nil; perl-indent-level: 4 -*-
 ## vim: autoindent tabstop=4 shiftwidth=4 expandtab softtabstop=4 filetype=perl
 ## crucible get metric --source flexran --type {UL, DL} --period <> --begin <> --end <> --breakout type
+## Debug: invoke "crucible console" and run this script by hand
 
 use strict;
 use warnings;
