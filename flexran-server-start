@@ -12,7 +12,8 @@ echo "enter flexran-server-start"
 echo "args; $@"
 
 xran_devices=""
-longopts="xran-devices:"
+cc_num=0
+longopts="xran-devices:,cc-num:"
 opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
 if [ $? -ne 0 ]; then
     exit_error "Unrecognized option specified"
@@ -26,6 +27,12 @@ while true; do
         #export PCIDEVICE_OPENSHIFT_IO_INTELNICS0=$1
         shift;
         ;;
+    --cc-num)
+        # For DEBUG, we may vary number of cells to change processing loads
+        shift;
+        cc_num=$1
+        shift;
+        ;;
     --)
         shift;
         break
@@ -37,9 +44,14 @@ while true; do
     esac
 done
 
+
 if [ "$xran_devices" != "" ]; then    
     log_file=$(realpath flexran-server.log)
     pushd /tmp/script-dir 
+    if [ "$cc_num" != 0 ]; then
+        source setting.env
+        sed -i 's/ccNum=.*/ccNum='${cc_num}'/' ${ORU_DIR}/config_file_o_ru.dat
+    fi
     ./09-ru_start.sh ${log_file}
     popd 
 fi
