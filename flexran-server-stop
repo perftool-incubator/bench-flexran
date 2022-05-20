@@ -6,7 +6,7 @@ echo "enter flexran-server-stop"
 echo "args; $@"
 
 xran_devices=""
-longopts="xran-devices:"
+longopts="xran-devices:,cc-num:"
 opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
 if [ $? -ne 0 ]; then
     exit_error "Unrecognized option specified"
@@ -18,6 +18,10 @@ while true; do
         shift;
         xran_devices=$1
         #export PCIDEVICE_OPENSHIFT_IO_INTELNICS0=$1
+        shift;
+        ;;
+    --cc-num)
+        shift;
         shift;
         ;;
     --)
