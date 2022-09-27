@@ -125,6 +125,7 @@ if ($rc == 0 and defined $fh) {
         $sample{'periods'} = \@periods;
         $sample{'primary-period'} = 'measurement';
         $sample{'primary-metric'} = $primary_metric;
+        $sample{'benchmark'} = 'flexran';
         $rc = put_json_file("post-process-data.json", \%sample);
         if ( $rc > 0 ) {
             printf "flexran-post-process(): Could not write file post-process-data.json\n";
