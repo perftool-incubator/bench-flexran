@@ -59,10 +59,17 @@ get_mcp_progress_status () {
 
 wait_mcp () {
     resume_mcp
-    sleep 60
+    printf "waiting 60 sec before checking mcp status "
+    local count=60
+    while [[ $count -gt 0  ]]; do
+        sleep 10
+        printf "."
+        count=$((count-10))
+    done
+
     local status=$(get_mcp_progress_status)
-    local count=300
-    printf "waiting for mcp complete on the baremetal host"
+    count=300
+    printf "\npolling 3000 sec for mcp complete, May lose API connection if SNO, during node reboot"
     while [[ $status != "False" ]]; do
         if ((count == 0)); then
             printf "\ntimeout waiting for mcp complete on the baremetal host!\n"
@@ -73,7 +80,7 @@ wait_mcp () {
         sleep 10
         status=$(get_mcp_progress_status)
     done
-    printf "\nmcp complete on the baremetal host\n"
+    printf "\nmcp complete on the baremetal host in %d sec\n" $(( (300-count) * 10 ))
 }
 
 wait_pod_in_namespace () {
@@ -176,7 +183,7 @@ Options:
      fi
 }
 
-get_mcp_progress_status () {
+another_get_mcp_progress_status () {
     if [[ "${SNO}" == "true" ]]; then
        status=$(oc get mcp | awk '/master-cnf/{if(match($2, /rendered-/)){print $4} else{print $3}}')
     else

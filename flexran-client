@@ -30,8 +30,11 @@ oru_cfg=None
 test_file=None
 xran=false
 xran_devices=
-max_runtime=60
+max_runtime=600
 flexran_is_running=1
+
+# The OPENness Operator provides PCIDEVICE_INTEL_COM_INTEL_FEC_5G or PCIDEVICE_INTEL_COM_INTEL_FEC_ACC100
+FEC_DEV_PCI=$(env | grep PCIDEVICE_INTEL_COM_INTEL_FEC | awk -F '=' '{print $2}')
 
 declare -A timer_cfg
         timer_cfg[l1]=$FLEXRAN_NR/l1/phycfg_timer.xml
@@ -65,16 +68,12 @@ function init_mount_fs_func {
    fi
 }
 
-#
-# PCIDEVICE_INTEL_COM_INTEL_FEC_5G is an env var that the OPENess Operator 
-# provides the container with.
-#
 function set_fec_mode_func {
     if [ "$fec_mode" == "hw" ]; then
-        if [ -z "$PCIDEVICE_INTEL_COM_INTEL_FEC_5G" ]; then
-            exit_error "PCIDEVICE_INTEL_COM_INTEL_FEC_5G is not defined. This must be defined to run flexran HW FEC"
+        if [ -z "$FEC_DEV_PCI" ]; then
+            exit_error "PCIDEVICE_INTEL_COM_INTEL_FEC  is not defined. This must be defined to run flexran HW FEC"
         fi
-        sed -i "s#<dpdkBasebandDevice>.*</dpdkBasebandDevice>#<dpdkBasebandDevice>${PCIDEVICE_INTEL_COM_INTEL_FEC_5G}</dpdkBasebandDevice>#" $1
+        sed -i "s#<dpdkBasebandDevice>.*</dpdkBasebandDevice>#<dpdkBasebandDevice>${FEC_DEV_PCI}</dpdkBasebandDevice>#" $1
         sed -i 's#<dpdkBasebandFecMode>.*</dpdkBasebandFecMode>#<dpdkBasebandFecMode>1</dpdkBasebandFecMode>#' $1
     else
         sed -i 's#<dpdkBasebandFecMode>.*</dpdkBasebandFecMode>#<dpdkBasebandFecMode>0</dpdkBasebandFecMode>#' $1
@@ -327,7 +326,7 @@ function flexran_first_half_func {
         echo "HK_CPUS: $HK_CPUS"
     fi
 
-    longopts="max-runtime:,xran-devices:,fec-mode:,test-file:,log-test:,usr1:,usr2:,usr3:,usr4:,usr5:"
+    longopts="duration:,xran-devices:,fec-mode:,test-file:,log-test:,usr1:,usr2:,usr3:,usr4:,usr5:"
     opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
     echo -e "\nCRU:flexran_first_half_func opts= " $opts
     if [ $? -ne 0 ]; then
@@ -390,8 +389,7 @@ function flexran_first_half_func {
                 #export PCIDEVICE_OPENSHIFT_IO_INTELNICS0=$1
                 shift;
                 ;;
-            --max-runtime)
-                # applicable to post processing only
+            --duration)
                 shift;
                 max_runtime=$1
                 shift;

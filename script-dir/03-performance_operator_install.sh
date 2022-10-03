@@ -21,7 +21,7 @@ mkdir -p ${MANIFEST_DIR}/
 
 ##### install performnance operator #####
 # skip if performance operator subscription already exists
-if ! oc get Subscription performance-addon-operator -n openshift-performance-addon 2>/dev/null; then
+if ! oc get Subscription performance-addon-operator -n openshift-performance-addon-operator 2>/dev/null; then
     echo "generating ${MANIFEST_DIR}/sub-perf.yaml ..."
     export OCP_CHANNEL=$(get_ocp_channel)
     envsubst < templates/sub-perf.yaml.template > ${MANIFEST_DIR}/sub-perf.yaml
@@ -29,7 +29,7 @@ if ! oc get Subscription performance-addon-operator -n openshift-performance-add
     echo "generating ${MANIFEST_DIR}/sub-perf.yaml: done"
 fi
 
-wait_pod_in_namespace openshift-performance-addon
+wait_pod_in_namespace openshift-performance-addon-operator
 
 ###### generate performance profile ######
 echo "Acquiring cpu info from worker node ${BAREMETAL_WORKER} ..."
@@ -41,7 +41,11 @@ else
     file="/etc/kubernetes/openshift-workload-pinning"
     if [ "$(exec_over_ssh ${BAREMETAL_WORKER} "test -e $file && echo true")" == "true" ]; then
         # awk: match "cpuset" line, strip double quotes from NF , print NF 
-        export DU_RESERVED_CPUS=$(exec_over_ssh ${BAREMETAL_WORKER} "cat /etc/kubernetes/openshift-workload-pinning" | awk '/cpuset/{gsub(/"/, "", $NF); print $NF;}' )
+        #export DU_RESERVED_CPUS=$(exec_over_ssh ${BAREMETAL_WORKER} "cat /etc/kubernetes/openshift-workload-pinning" | awk '/cpuset/{gsub(/"/, "", $NF); print $NF;}' )
+
+        # Use yq to parse, but yq is not available on node. Hence run yq locally,
+        cpuset=$(exec_over_ssh ${BAREMETAL_WORKER} "cat /etc/kubernetes/openshift-workload-pinning" | grep cpuset )
+        export DU_RESERVED_CPUS=$(echo $cpuset | yq e '.management.cpuset' -)
     else
         echo "WARNING this SNO has no workload-paritioning. Please fix it and then try again"
         exit;
@@ -63,7 +67,7 @@ echo "generating ${MANIFEST_DIR}/performance_profile.yaml: done"
 
 ##### apply performance profile ######
 if [ "${SNO}" == "true" ]; then
-   oc label mcp master machineconfiguration.openshift.io/role=master
+   oc label --overwrite mcp master machineconfiguration.openshift.io/role=master
 else
    ./create_mcp.sh
 fi
