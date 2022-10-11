@@ -192,6 +192,9 @@ another_get_mcp_progress_status () {
     echo ${status}
 }
 
+function ver { 
+   printf "%03d%03d%03d%03d" $(echo "$1" | tr '.' ' '); 
+}
 
 hn_echo() {
     echo $@

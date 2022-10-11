@@ -24,7 +24,7 @@ fi
 
 wait_pod_in_namespace openshift-sriov-network-operator
 
-if [[ "${SNO}" == "false" ]]; then
+if [[ "${SNO}" == "true" ]]; then
    echo "disable drain since this is SNO"
    oc patch sriovoperatorconfig default --type=merge -n openshift-sriov-network-operator --patch '{ "spec": { "disableDrain": true } }'
 fi
@@ -35,10 +35,12 @@ echo "Acquiring SRIOV interface PCI info from worker node ${BAREMETAL_WORKER} ..
 export DU_SRIOV_INTERFACE_PCI=$(exec_over_ssh ${BAREMETAL_WORKER} "ethtool -i ${DU_SRIOV_INTERFACE}" | awk '/bus-info:/{print $NF;}')
 echo "Acquiring SRIOV interface PCI info from worker node ${BAREMETAL_WORKER}: done"
 
+# Config the NIC
 echo "generating ${MANIFEST_DIR}/sriov-nic-policy.yaml ..."
 envsubst < templates/sriov-nic-policy.yaml.template > ${MANIFEST_DIR}/sriov-nic-policy.yaml
 echo "generating ${MANIFEST_DIR}/sriov-nic-policy.yaml: done"
 
+# Config the VFs, VLAN
 echo "generating ${MANIFEST_DIR}/sriov-network.yaml ..."
 mkdir -p ${MANIFEST_DIR}/
 envsubst < templates/sriov-network.yaml.template > ${MANIFEST_DIR}/sriov-network.yaml
@@ -65,7 +67,7 @@ fi
 
 # is VF up?
 if [[ "${WAIT_MCP}" == "true" ]]; then
-    count=30
+    count=60
     printf "waiting for sriov VF come up"
     while ! exec_over_ssh ${BAREMETAL_WORKER} "ip link show ${DU_SRIOV_INTERFACE}" | egrep '^\s+vf\s'; do
         count=$((count -1))
