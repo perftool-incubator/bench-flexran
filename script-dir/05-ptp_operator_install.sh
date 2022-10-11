@@ -15,11 +15,11 @@ parse_args $@
 mkdir -p ${MANIFEST_DIR}/
 
 ###### install ptp operator #####
+channel=$(get_ocp_channel)
 # skip if ptp operator subscription already exists 
 if ! oc get Subscription ptp-operator-subscription -n openshift-ptp 2>/dev/null; then 
     echo "generating ${MANIFEST_DIR}/sub-ptp.yaml ..."
     #export OCP_CHANNEL=$(get_ocp_channel)
-    channel=$(get_ocp_channel)
     if [[ "${channel}" == "4.10" ]]; then
     	export OCP_CHANNEL=stable
     else
@@ -39,7 +39,12 @@ if [[ "${SNO}" == "false" ]]; then
 else
     export MCP=master
 fi
-envsubst < templates/ptp-config.yaml.template > ${MANIFEST_DIR}/ptp-config.yaml
+
+if [ $(ver ${channel}) -ge $(ver 4.10) ] ; then
+   envsubst < templates/ptp-config-410.yaml.template > ${MANIFEST_DIR}/ptp-config.yaml
+else
+   envsubst < templates/ptp-config.yaml.template > ${MANIFEST_DIR}/ptp-config.yaml
+fi
 echo "generating ${MANIFEST_DIR}/ptp-config.yaml: done"
 
 ##### apply ptp-config ######
@@ -53,8 +58,9 @@ fi
 echo "disable chronyd ..."
 envsubst < templates/disable-chronyd.yaml.template > ${MANIFEST_DIR}/disable-chronyd.yaml
 
-echo "HN skip disable chronyd"
-exit
+# Tip: HN while debug ptp, consider disabling chronyd one time and not re-enable chronyd 
+# in cleanup. Then you can invoke install/cleanup over and over again w/o long wait.
+echo "Tip: consider one-time chronyd disabling during PTP DEBUG"
 
 if ! oc get MachineConfig disable-chronyd 0>/dev/null; then
 oc create -f ${MANIFEST_DIR}/disable-chronyd.yaml
