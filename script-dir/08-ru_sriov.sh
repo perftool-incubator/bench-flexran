@@ -1,12 +1,16 @@
 #!/bin/sh
-
+#
+# New since 22.03.
+#   Init: during testbed prep
+#       08-ru_siov_.sh setup  (Manual by CLI)
+#   Each run:
+#       08-ru_siov_.sh config (Auto my flexran-server-start scrip)
 #
 # This script creates RU VFs and fixes up config files to run the below XRAN test.
 # ORU_DIR=${FLEXRAN_DIR}/bin/nr5g/gnb/l1/orancfg/sub3_mu0_20mhz_4x4/oru
 #
 # WARNING WARNING WARNING
-# Limitation: This script pins to a specific xran test hardcoded by ORU_DIR in setting.env.
-# In other words, to run different XRAN test (i.e sub6_mu1_100mhz_4x4), this script must be rerun.
+# Limitation: This script is indirectly hardcoded to the xran test defined in $ORU_DIR in setting.env.
 #
 
 set -euo pipefail
@@ -66,6 +70,19 @@ setup() {
     echo "SRIOV setup on RU: done"
 }     
 
+gather_pci_info() {
+
+    vfs_str=""
+    for v in 0 1; do
+        vf_pci=$(realpath /sys/class/net/${RU_SRIOV_INTERFACE}/device/virtfn${v} | awk -F '/' '{print $NF}')
+        if [[ -z "${vfs_str}" ]]; then
+            vfs_str=${vf_pci}
+        else
+            vfs_str="${vfs_str},${vf_pci}"
+        fi
+    done
+}
+
 clean() {
     echo "Cleaning up SRIOV on RU"
     echo 0 > /sys/class/net/${RU_SRIOV_INTERFACE}/device/sriov_numvfs
@@ -87,8 +104,12 @@ fi
 case "${ACTION}" in
     setup)
         setup 
+    ;;
+    config)
+        gather_pci_info
         update_run_o_ru_file
-        sed  -i -r "s/MTUSize=.*/MTUSize=1500/" ${ORU_DIR}/config_file_o_ru.dat
+        # v21.03 used 1500. There needs to mod testmac config as well
+        #sed  -i -r "s/MTUSize=.*/MTUSize=1500/" ${ORU_DIR}/config_file_o_ru.dat
     ;;
     clean)
         clean 
@@ -96,5 +117,4 @@ case "${ACTION}" in
     *)
         print_usage
 esac
-
 

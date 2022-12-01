@@ -1,0 +1,79 @@
+#!/bin/bash
+
+#
+# This script copies flexran custom config from STAGED dir
+# Description:  FlexRAN rickshaw's "infra" handler
+#   Step 3 of a 3-step procedure to setup custom configs for FlexRAN testmac.
+# Env:
+#   It runs on the engine. 
+# Caller:
+#   engine-script
+# 
+# Relates:
+#   Step1: 
+#       See rickshaw.json:    "pre-script" : "%bench-dir%/flexran-setup-env"
+#   Step 2 in rickshaw.json:
+#       files_from_controller:
+#            { "src": "%run-dir%/STAGED_CUSTOM/", "dest": "." , "required": false }
+#   Step 3 in rickshaw.json:
+#           "infra": "flexran-infra",
+#
+
+FLEXRAN_INFRA_LOG_FILE=flexran-infra.log
+
+exec >$FLEXRAN_INFRA_LOG_FILE
+exec 2>&1
+
+. /usr/bin/flexran-base || (echo "/usr/bin/flexran-base not found"; exit 1)
+dump_runtime
+validate_label
+validate_sw_prereqs
+
+duration=0
+
+longopts="duration:"
+opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
+echo -e "\nCRU:flexran_first_half_func opts= " $opts
+if [ $? -ne 0 ]; then
+    exit_error "Unrecognized option specified"
+fi
+eval set -- "$opts";
+while true; do
+    case "$1" in
+    --duration)
+        shift;
+        duration=$1
+        shift;
+        ;;
+    --)
+        shift;
+        break
+        ;;
+    *)
+        exit_error "Unsupport option $1"
+        break
+        ;;
+    esac
+done
+    
+pwd
+
+# This script is running at sample dir i.e /tmp/tmp.xxx/iteration-1/sample-1
+# If this run has custom config, the custom dir was copied to /tmp/tmp.xxx/STAGED_CUSTOM_DIR. See rickshaw.json
+
+pushd ../../
+
+if [ -d "STAGED_CUSTOM_DIR" ]; then
+    echo -e "\nDirectory ./STAGED_CUSTOM_DIR exists." 
+    if [ -f STAGED_CUSTOM_DIR/setup ]; then
+         pushd STAGED_CUSTOM_DIR
+         bash ./setup
+         popd
+    fi
+else
+    echo "Error: Directory ./STAGED_CUSTOM_DIR does not exists."
+fi
+
+popd
+echo -e "\nflexran-infra completed"
+

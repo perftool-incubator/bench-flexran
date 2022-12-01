@@ -59,6 +59,7 @@ sleep 1
 
 ##### apply sriov-network ######
 #// Configuring an SR-IOV ethernet network attachment
+#   Debug: kubectl get network-attachment-definitions  -n crucible-rickshaw
 if ! oc get SriovNetwork sriov-vlan10 -n openshift-sriov-network-operator 2>/dev/null; then
     echo "create SriovNetwork ..."
     oc create -f ${MANIFEST_DIR}/sriov-network.yaml

@@ -30,8 +30,12 @@ oru_cfg=None
 test_file=None
 xran=false
 xran_devices=
-max_runtime=600
+duration=600
 flexran_is_running=1
+
+if [[ -z ${FLEXRAN_SDK} ]]; then
+    export FLEXRAN_NOT_INCLUDED=1
+fi
 
 # The OPENness Operator provides PCIDEVICE_INTEL_COM_INTEL_FEC_5G or PCIDEVICE_INTEL_COM_INTEL_FEC_ACC100
 FEC_DEV_PCI=$(env | grep PCIDEVICE_INTEL_COM_INTEL_FEC | awk -F '=' '{print $2}')
@@ -61,11 +65,13 @@ function flexran_main_func {
 
 function init_mount_fs_func {
     # Flexran S/W is ~100GB. In development, we host mount it. Now, link it to the desired filepaths.
-    if [ ! -L  /opt/flexran ]; then
-       ln -s /tmp/opt/flexran /opt/flexran
-       ln -s /tmp/opt/intel /opt/intel
-       ln -s /tmp/opt/dpdk-20.11 /opt/dpdk-20.11
-   fi
+     if [[ -v FLEXRAN_NOT_INCLUDED ]]; then
+       if [ ! -L  /opt/flexran ]; then
+          ln -s /tmp/opt/flexran /opt/flexran
+          ln -s /tmp/opt/intel /opt/intel
+          ln -s /tmp/opt/dpdk-20.11 /opt/dpdk-20.11
+      fi
+    fi
 }
 
 function set_fec_mode_func {
@@ -162,15 +168,15 @@ function stop_testmac_func {
 function flush_testmac_func {
     # Send harmless 'version' commands to flush its stdout.
     flexran_get_run_status_func
-    while [ $max_runtime -gt 0 ] && [ "$flexran_is_running" = 1  ]; do
-       echo -e "\nCRU: Wait for results to drain. $max_runtime seconds remained"
+    while [ $duration -gt 0 ] && [ "$flexran_is_running" = 1  ]; do
+       echo -e "\nCRU: Wait for results to drain. $duration seconds remained"
        sleep 2
        echo "version" > $L2_PIPE
-       max_runtime=$((max_runtime-2))
+       duration=$((duration-2))
        flexran_get_run_status_func
     done
 
-    if [ $max_runtime -le 0 ]; then
+    if [ $duration -le 0 ]; then
         error_status+=" Timeout waiting for completion signature"
     fi
 }
@@ -391,7 +397,7 @@ function flexran_first_half_func {
                 ;;
             --duration)
                 shift;
-                max_runtime=$1
+                duration=$1
                 shift;
                 ;;
             --)
