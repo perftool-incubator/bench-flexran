@@ -1,53 +1,70 @@
 #!/bin/bash
 # -*- mode: sh; indent-tabs-mode: nil; sh-basic-offset: 4 -*-
 # vim: autoindent tabstop=4 shiftwidth=4 expandtab softtabstop=4 filetype=bash
-
-# This function copy the whole support directory from $script-dir under the filepath
-# where run.sh started to $run-dir/$scrip-dir. The $script-dir contains crucible-agnostic scripts 
-# for flexran. It expects that rickshaw.json will copy $run-dir/$script-dir to the engine(s)
 #
+# Description: FlexRAN rickshaw's "pre-script" handler
+#   Step 1 of a 3-step procedure to setup custom configs for FlexRAN testmac.
+#   This script copies a custom config CUSTOM_DIR to crucible controller $run-dir/STAGED_CUSTOM_DIR
+#   Ex:
+#     cp -r /hostfs/home/hnhan/crucible-examples/flexran/ACC100/TIMER-SW/CUSTOM_DIR
+#           to /var/lib/crucible/run/flexran--xxx/run/STAGED_CUSTOM_DIR
+#     See mv-params.json:   { "arg": "engine-infra", "vals": ["CUSTOM_DIR"] }
+# Env:
+#   It runs on the crucible controller. 
+# Caller:
+#   Is invoked by rickshaw.json: "pre-script"
+#   See rickshaw.json:    "pre-script" : "%bench-dir%/flexran-setup-env"
+# 
 # Relates:
-#   mv-params.json:   { "arg": "script-dir", "vals": ["flexran-clone/cru"] }
+#   Step 2 in rickshaw.json:
+#       files_from_controller:
+#            { "src": "%run-dir%/STAGED_CUSTOM_DIR/", "dest": "." , "required": false }
+#   Step 3 in rickshaw.json:
+#           "infra": "flexran-infra",
 #
-# Source: CWD/$script-dir
-# Destination: $run-dir/$script-dir
 
-echo "HN pre-script script-dir $@"
+echo "FlexRAN pre-script engine-infra $@"
 
-script_dir=""
+custom_dir=""
 
 while [ ! -z $1 ]; do
     # TODO: support --arg val
     arg=`echo $1 | awk -F= '{print $1}'`
-    if [ "$arg" == "--script-dir" ]; then
-        script_dir="`echo $1 | awk -F= '{print $2}'`"
-        echo "Found script-dir argument = ${script_dir}"
+    if [ "$arg" == "--engine-infra" ]; then
+        custom_dir="`echo $1 | awk -F= '{print $2}'`"
+        echo "Found engine-infra argument = ${custom_dir}"
     else
-        echo "Ignoring this script_dir argument: $arg"
+        echo "Not --engine-infra, ignoring this argument: $arg"
     fi
     shift
 done
 
-#if a --script_dir presents  do it
-script_path=""
-if [ -n "${script_dir}" ]; then
+# if a --custom_dir presents copy dir to $run-dir/TAGED_CUSTOM_DIR
+custom_path=""
+if [ -n "${custom_dir}" ]; then
     if [ -n "${CRUCIBLE_HOSTFS_PWD}" ]; then
         echo "Using CRUCIBLE_HOSTFS_PWD=${CRUCIBLE_HOSTFS_PWD}"
-        script_path+="/hostfs"
-        script_path+=${CRUCIBLE_HOSTFS_PWD}
-        script_path+="/"
+        custom_path+="/hostfs"
+        custom_path+=${CRUCIBLE_HOSTFS_PWD}
+        custom_path+="/"
     fi
-    script_path+=${script_dir}
+    custom_path+=${custom_dir}
 
-    if [ ! -d ${script_path} ]; then
-        echo "ERROR: Could not find [${script_path}]"
+    if [ ! -d ${custom_path} ]; then
+        echo "ERROR: Could not find [${custom_path}]"
         exit 1
     else
-        echo "Copying dir ${script_path} to $(basename -- $script_dir)"
-        /bin/cp -r "${script_path}" "$(basename -- $script_dir)"
+        # /bin/cp -r /hostfs/home/hnhan/crucible-examples/flexran/ACC100/TIMER-SW/CUSTOM to  /var/lib/crucible/run/flexran--2022-11-28_18:39:04_UTC--0f66c6b5-e589-44a3-ab36-51772eb0bd62/run/STAGED_CUSTOM_DIR
+        #echo "Copying dir ${custom_path} to $(basename -- $custom_dir)"
+        echo "Copying dir ${custom_path} to ./STAGED_CUSTOM_DIR"
+        #echo /bin/cp -r "${custom_path}" "$(basename -- $custom_dir)"
+        /bin/cp -r "${custom_path}" ./STAGED_CUSTOM_DIR
+        pwd
+        ls
         exit 0
     fi
 fi
 
-echo "HN pre-script no script-dir $@"
-# Do nothing when there is no --script-dir parameter
+echo "FlexRAN pre-script no engine-infra $@"
+# Do nothing when there is no --engine-infra parameter
+

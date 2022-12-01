@@ -9,7 +9,7 @@ validate_label
 validate_sw_prereqs
 
 echo "enter flexran-server-start"
-echo "args; $@"
+echo "opts; $@"
 
 xran_devices=""
 cc_num=0
@@ -49,9 +49,11 @@ if [ "$xran_devices" != "" ]; then
     log_file=$(realpath flexran-server.log)
     pushd /tmp/script-dir 
     if [ "$cc_num" != 0 ]; then
-        source setting.env
+        source  /opt/flexran_env_vars.sh
         sed -i 's/ccNum=.*/ccNum='${cc_num}'/' ${ORU_DIR}/config_file_o_ru.dat
     fi
+    # Part of the testbed provisioning, we must have run "./08-ru_sriov.sh setup". Now we run "config"
+    ./08-ru_sriov.sh config
     ./09-ru_start.sh ${log_file}
     popd 
 fi

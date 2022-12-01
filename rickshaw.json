@@ -14,15 +14,21 @@
             { "src": "%bench-dir%/flexran-base", "dest": "/usr/bin/" },
             { "src": "%bench-dir%/flexran-runtime", "dest": "/usr/bin/" },
             { "src": "%bench-dir%/flexran-client", "dest": "/usr/bin/" },
+            { "src": "%bench-dir%/flexran-infra", "dest": "/usr/bin/" },
             { "src": "%bench-dir%/driver.sh", "dest": "/usr/bin/" },
             { "src": "%bench-dir%/flexran_env_vars.sh", "dest": "/opt/" },
             { "src": "%bench-dir%/autotest.py", "dest": "/usr/bin" },
             { "src": "%bench-dir%/cpu.py", "dest": "/usr/bin" },
             { "src": "%bench-dir%/log.py", "dest": "/usr/bin" },
-            { "src": "%bench-dir%/process_testfile.py", "dest": "/usr/bin" }
- 
+            { "src": "%bench-dir%/process_testfile.py", "dest": "/usr/bin" },
+            { 
+                "src": "%run-dir%/STAGED_CUSTOM_DIR/", 
+                "dest": "." ,
+                "required": false
+            }
         ],
         "runtime": "flexran-runtime",
+        "infra": "flexran-infra",
         "start": "flexran-client"
     },
 
@@ -31,6 +37,7 @@
             { "src": "%bench-dir%/flexran-base", "dest": "/usr/bin/" },
             { "src": "%bench-dir%/flexran-server-start", "dest": "/usr/bin/" },
             { "src": "%bench-dir%/flexran-server-stop", "dest": "/usr/bin/" },
+            { "src": "%bench-dir%/flexran_env_vars.sh", "dest": "/opt/" },
             { "src": "%bench-dir%/script-dir", "dest": "/tmp/script-dir" }
         ],
         "start": "flexran-server-start",

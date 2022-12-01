@@ -75,7 +75,7 @@ echo "starting ru"
 ls -lt ${ORU_DIR}
 echo -e "$(pwd) run: cd ${FLEXRAN_DIR}; source ./set_env_var.sh -d; cd ${ORU_DIR}; ./run_o_ru.sh"
 
-ru_cmd="cd ${FLEXRAN_DIR}; source ./set_env_var.sh -d; cd ${ORU_DIR}; ./run_o_ru.sh"
+ru_cmd="cd ${FLEXRAN_DIR}; source ./set_env_var.sh -d; cd ${ORU_DIR}; bash ./run_o_ru.sh"
 
 tmux kill-session -t ru 2>/dev/null || true
 sleep 1

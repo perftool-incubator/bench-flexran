@@ -33,8 +33,15 @@ class ProcessTestfile:
             if 'setcore' in line:
                 setcore_index = line.index('setcore')
                 # The number of cpus (cores or threads, depending on hyperthreading, needed.)
-                # Take the string, convert to hex, convert to binary, count the 1s.
-                num_cpus = (bin(int(line[setcore_index + len('setcore'):].strip(), 16))[2:]).count('1')
+                # Example of setcore with 1 or more core masks:
+                #    setcore 0xff0000000 0xff000
+                #    setcore 0xff00000ff 
+                # Gather the core masks into an array of tokens.
+                tokens=(line[setcore_index + len('setcore'):].strip()).split() 
+                num_cpus=0
+                # Convert each mask to hex. Convert to binary. Count the 1s.
+                for token in tokens:
+                    num_cpus += (bin(int(token, 16))[2:]).count('1')  
                 # Create the hex representation and replace the old setcore
                 new_setcore_hex = rsc.get_free_siblings_mask(num_cpus, max_mask_len=16)
                 logger.debug('original cfg: %s' % cfg[line_index])
