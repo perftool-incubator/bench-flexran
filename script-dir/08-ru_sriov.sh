@@ -18,6 +18,7 @@ set -euo pipefail
 source ./functions.sh
 source ./setting.env
 
+# HN: TBD move test params ORU_DIR out of here into flexran-server-start
 if [[ ! -f ${ORU_DIR}/run_o_ru.sh.orig ]]; then
    # CRU/Cru HN save orig file
    cp ${ORU_DIR}/run_o_ru.sh ${ORU_DIR}/run_o_ru.sh.orig

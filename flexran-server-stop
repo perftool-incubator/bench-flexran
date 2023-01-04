@@ -38,10 +38,11 @@ done
 if [ "$xran_devices" != "" ]; then    
     pushd /tmp/script-dir
     ./09-ru_stop.sh
-    source ./setting.env
+    #source ./setting.env
     popd
     # collect artifacts
     # TBD HN. decouple hardcoded $ORU_DIR
+    source  /opt/flexran/cru_env_vars.sh
     cp ${ORU_DIR}/{config*,run*,usecase*} .
 fi
 

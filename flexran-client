@@ -90,7 +90,10 @@ function start_l1_func {
     xran=$1
     echo -e "CRU: $(date +%H:%M:%S) Start L1 xran=$xran"
 
-    source /opt/flexran_env_vars.sh
+    # Only v21.03 needs this sourcing
+    if [[ -z "${FLEXRAN_SDK}" ]]; then
+       source /opt/flexran_env_vars.sh
+    fi
 
     # Launch L1 process in background. 
     # To get around L1 process exits as soon as its stdin is closed as a result of 
@@ -125,7 +128,11 @@ function stop_l1_func {
 
 function start_testmac_func {
     echo -e "\nCRU: $(date +%H:%M:%S) Start TESTMAC xran=$1"
-    source /opt/flexran_env_vars.sh
+
+    # Only v21.03 needs this sourcing
+    if [[ -z "${FLEXRAN_SDK}" ]]; then
+       source /opt/flexran_env_vars.sh
+    fi
 
     # Launch Testmac process in background. Redirect stdin to a pipe.  See L1 note.
     if [ -p  $L2_PIPE ]; then
@@ -575,11 +582,11 @@ fi
 # Step 3: open a shell, oc rsh rickshaw-client-1
 # Step 4: open another shell, oc rsh rickshaw-client-1
 # Step 5: on first shell
-#       source /opt/flexran_env_vars.sh
+#       source /opt/flexran_env_vars.sh  <== applicable to only v21.03
 #       cd /opt/flexran/bin/nr5g/gnb/l1
 #       ./l1.sh -e
 # Step 6: on second shell
-#       source /opt/flexran_env_vars.sh
+#       source /opt/flexran_env_vars.sh  <=== applicable to v21.03 only
 #       cd /opt/flexran/bin/nr5g/gnb/testmac
 #       ./l2.sh 
 #           or
