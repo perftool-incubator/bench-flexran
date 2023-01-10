@@ -92,6 +92,7 @@ clean() {
 
 update_run_o_ru_file() {
     if [[ -n "${vfs_str}" ]]; then
+        # TBD - ORU_DIR should be moved to mv-params.json
         sed -i -r "s/(.*vf_addr_o_xu_a).*/\1 \"${vfs_str}\"/" ${ORU_DIR}/run_o_ru.sh
     fi
 }

@@ -41,6 +41,7 @@ fi
 
 if [[ ! -f ${ORU_DIR}/usecase_ru.cfg.orig ]]; then
     #HN Crucible saves orig file
+    # TBD - ORU_DIR should be moved to mv-params.json
     cp ${ORU_DIR}/usecase_ru.cfg  ${ORU_DIR}/usecase_ru.cfg.orig
 fi
 
