@@ -6,7 +6,7 @@ echo "enter flexran-server-stop"
 echo "args; $@"
 
 xran_devices=""
-longopts="xran-devices:,cc-num:"
+longopts="xran-devices:,cc-num:,oru-dir:"
 opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
 if [ $? -ne 0 ]; then
     exit_error "Unrecognized option specified"
@@ -22,6 +22,11 @@ while true; do
         ;;
     --cc-num)
         shift;
+        shift;
+        ;;
+    --oru-dir)
+        shift;
+        export ORU_DIR=$1
         shift;
         ;;
     --)
@@ -41,8 +46,7 @@ if [ "$xran_devices" != "" ]; then
     #source ./setting.env
     popd
     # collect artifacts
-    # TBD HN. decouple hardcoded $ORU_DIR
-    source  /opt/flexran/cru_env_vars.sh
+    source  /opt/flexran/sdk.env
     cp ${ORU_DIR}/{config*,run*,usecase*} .
 fi
 

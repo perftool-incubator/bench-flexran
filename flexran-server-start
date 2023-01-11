@@ -13,7 +13,7 @@ echo "opts; $@"
 
 xran_devices=""
 cc_num=0
-longopts="xran-devices:,cc-num:"
+longopts="xran-devices:,cc-num:,oru-dir:"
 opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
 if [ $? -ne 0 ]; then
     exit_error "Unrecognized option specified"
@@ -33,6 +33,11 @@ while true; do
         cc_num=$1
         shift;
         ;;
+    --oru-dir)
+        shift;
+        export ORU_DIR=$1
+        shift;
+        ;;
     --)
         shift;
         break
@@ -48,8 +53,8 @@ done
 if [ "$xran_devices" != "" ]; then    
     log_file=$(realpath flexran-server.log)
     pushd /tmp/script-dir 
+    source  /opt/flexran/sdk.env
     if [ "$cc_num" != 0 ]; then
-        source  /opt/flexran/cru_env_vars.sh
         sed -i 's/ccNum=.*/ccNum='${cc_num}'/' ${ORU_DIR}/config_file_o_ru.dat
     fi
     # Part of the testbed provisioning, we must have run "./08-ru_sriov.sh setup". Now we run "config"
