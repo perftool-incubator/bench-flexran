@@ -20,16 +20,18 @@ fi
 mkdir -p ${MANIFEST_DIR}/
 
 ##### install performnance operator #####
-# skip if performance operator subscription already exists
-if ! oc get Subscription performance-addon-operator -n openshift-performance-addon-operator 2>/dev/null; then
+# skip performance operator if version > 4.10 or subscription already exists 
+channel=$(get_ocp_channel)
+if [ $(ver ${channel}) -le $(ver 4.10) ] ; then
+  if ! oc get Subscription performance-addon-operator -n openshift-performance-addon-operator 2>/dev/null; then
     echo "generating ${MANIFEST_DIR}/sub-perf.yaml ..."
     export OCP_CHANNEL=$(get_ocp_channel)
     envsubst < templates/sub-perf.yaml.template > ${MANIFEST_DIR}/sub-perf.yaml
     oc create -f ${MANIFEST_DIR}/sub-perf.yaml
     echo "generating ${MANIFEST_DIR}/sub-perf.yaml: done"
+  fi
+  wait_pod_in_namespace openshift-performance-addon-operator
 fi
-
-wait_pod_in_namespace openshift-performance-addon-operator
 
 ###### generate performance profile ######
 echo "Acquiring cpu info from worker node ${BAREMETAL_WORKER} ..."

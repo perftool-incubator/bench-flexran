@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # This script is invoked by the flexran server. It launches the XRAN RU.
-#   cd /opt/flexran && source ./set_env_var.sh -d
+#   cd /opt/flexran && source sdk.env 
 #   cd bin/nr5g/gnb/l1/orancfg/sub3_mu0_20mhz_4x4/oru
 #   ./run_o_ru.sh
 #
@@ -40,7 +40,7 @@ else
 fi
 
 if [[ ! -f ${ORU_DIR}/usecase_ru.cfg.orig ]]; then
-    #HN Crucible saves orig file
+    # Save orig file
     cp ${ORU_DIR}/usecase_ru.cfg  ${ORU_DIR}/usecase_ru.cfg.orig
 fi
 
@@ -73,9 +73,9 @@ echo "cpu setting updated"
 echo "starting ru"
 
 ls -lt ${ORU_DIR}
-echo -e "$(pwd) run: cd ${FLEXRAN_DIR}; source ./set_env_var.sh -d; cd ${ORU_DIR}; ./run_o_ru.sh"
-
-ru_cmd="cd ${FLEXRAN_DIR}; source ./set_env_var.sh -d; cd ${ORU_DIR}; bash ./run_o_ru.sh"
+env
+echo -e "$(pwd) run: cd ${FLEXRAN_ROOT}; source sdk.env; cd ${ORU_DIR}; bash ./run_o_ru.sh"
+ru_cmd="cd ${FLEXRAN_ROOT}; source sdk.env; cd ${ORU_DIR}; bash ./run_o_ru.sh"
 
 tmux kill-session -t ru 2>/dev/null || true
 sleep 1

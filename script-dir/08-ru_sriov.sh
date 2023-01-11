@@ -7,10 +7,7 @@
 #       08-ru_siov_.sh config (Auto my flexran-server-start scrip)
 #
 # This script creates RU VFs and fixes up config files to run the below XRAN test.
-# ORU_DIR=${FLEXRAN_DIR}/bin/nr5g/gnb/l1/orancfg/sub3_mu0_20mhz_4x4/oru
-#
-# WARNING WARNING WARNING
-# Limitation: This script is indirectly hardcoded to the xran test defined in $ORU_DIR in setting.env.
+# ORU_DIR=${FLEXRAN_ROOT}/bin/nr5g/gnb/l1/orancfg/sub3_mu0_20mhz_4x4/oru
 #
 
 set -euo pipefail
@@ -18,7 +15,6 @@ set -euo pipefail
 source ./functions.sh
 source ./setting.env
 
-# HN: TBD move test params ORU_DIR out of here into flexran-server-start
 if [[ ! -f ${ORU_DIR}/run_o_ru.sh.orig ]]; then
    # CRU/Cru HN save orig file
    cp ${ORU_DIR}/run_o_ru.sh ${ORU_DIR}/run_o_ru.sh.orig
@@ -92,6 +88,7 @@ clean() {
 
 update_run_o_ru_file() {
     if [[ -n "${vfs_str}" ]]; then
+        # TBD - ORU_DIR should be moved to mv-params.json
         sed -i -r "s/(.*vf_addr_o_xu_a).*/\1 \"${vfs_str}\"/" ${ORU_DIR}/run_o_ru.sh
     fi
 }
