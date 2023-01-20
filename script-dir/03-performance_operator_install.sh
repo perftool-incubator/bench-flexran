@@ -74,6 +74,9 @@ else
    ./create_mcp.sh
 fi
 
+# Give the Operator some delays to reach ready state. Else it can error out.
+sleep 10
+
 echo "apply ${MANIFEST_DIR}/performance_profile.yaml ..."
 oc apply -f ${MANIFEST_DIR}/performance_profile.yaml
 

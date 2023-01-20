@@ -24,6 +24,9 @@ fi
 
 wait_pod_in_namespace openshift-sriov-network-operator
 
+# give it a little delay. W/o delay we could encounter error on the next "oc patch" command.
+sleep 10
+
 if [[ "${SNO}" == "true" ]]; then
    echo "disable drain since this is SNO"
    oc patch sriovoperatorconfig default --type=merge -n openshift-sriov-network-operator --patch '{ "spec": { "disableDrain": true } }'
