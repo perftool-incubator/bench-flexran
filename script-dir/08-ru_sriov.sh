@@ -15,18 +15,20 @@ set -euo pipefail
 source ./functions.sh
 source ./setting.env
 
-if [[ ! -f ${ORU_DIR}/run_o_ru.sh.orig ]]; then
+save_orig()  {
+ if [[ ! -f ${ORU_DIR}/run_o_ru.sh.orig ]]; then
    # CRU/Cru HN save orig file
    cp ${ORU_DIR}/run_o_ru.sh ${ORU_DIR}/run_o_ru.sh.orig
    cp ${ORU_DIR}/config_file_o_ru.dat  ${ORU_DIR}/config_file_o_ru.dat.orig
-fi
+ fi
 
 
-if [[ ! -e /sys/class/net/${RU_SRIOV_INTERFACE} ]]; then
+ if [[ ! -e /sys/class/net/${RU_SRIOV_INTERFACE} ]]; then
     echo "RU_SRIOV_INTERFACE ${RU_SRIOV_INTERFACE} not exists"
     exit 1
-fi
+ fi
 
+}
 
 print_usage() {
     declare -A arr
@@ -104,6 +106,7 @@ case "${ACTION}" in
         setup 
     ;;
     config)
+        save_orig
         gather_pci_info
         update_run_o_ru_file
         # v21.03 used 1500. There needs to mod testmac config as well
