@@ -397,8 +397,12 @@ function flexran_first_half_func {
                 ;;
             --xran-devices)
                 shift;
-                xran_devices=$1
-                xran=true
+                xran_devices=$(env | grep $1 | awk -F '=' '{print $2}')
+                if [ !  -z $xran_devices ]; then
+                    xran=true
+                else
+                    exit_error "No xran-devices $1 found"
+                fi
                 #export PCIDEVICE_OPENSHIFT_IO_INTELNICS0=$1
                 shift;
                 ;;

@@ -46,13 +46,21 @@ foreach my $i (qw(begin end)) {
     close FH;
 }
 
-my $primary_metric = 'DL';
+my $primary_metric = 'GNB_DL_FEC_LINK-AVG';
 my $metric_data_name;
 my %names = ();
 my $num_sample=0;
-my %ul_desc = ('source' => 'flexran', 'class' => 'count', 'type' => 'UL');
-my %dl_desc = ('source' => 'flexran', 'class' => 'count', 'type' => 'DL');
-my $desc_ref;
+my %ul_min_desc = ('source' => 'flexran', 'class' => 'count', 'type' => 'GNB_UL_FEC_LINK-MIN');
+my %ul_avg_desc = ('source' => 'flexran', 'class' => 'count', 'type' => 'GNB_UL_FEC_LINK-AVG');
+my %ul_max_desc = ('source' => 'flexran', 'class' => 'count', 'type' => 'GNB_UL_FEC_LINK-MIN');
+
+my %dl_min_desc = ('source' => 'flexran', 'class' => 'count', 'type' => 'GNB_DL_FEC_LINK-MIN');
+my %dl_avg_desc = ('source' => 'flexran', 'class' => 'count', 'type' => 'GNB_DL_FEC_LINK-AVG');
+my %dl_max_desc = ('source' => 'flexran', 'class' => 'count', 'type' => 'GNB_DL_FEC_LINK-MAX');
+
+my $desc_min_ref;
+my $desc_avg_ref;
+my $desc_max_ref;
 my $result_file = "l1_mlog_stats.txt";
 my $match = 0;
 my %low_name  = ('type' => 'low latency');
@@ -82,12 +90,17 @@ if ($rc == 0 and defined $fh) {
         if ( /GNB_DL_FEC_LINK *AVG/ || /GNB_UL_FEC_LINK *AVG/ ) {
             my @latencies = split(/\s+/, $_);
             if ( /GNB_UL_FEC_LINK *AVG/ ) {
-                $desc_ref = \%ul_desc;
-                printf "log: %s\n", $_;
+                printf "UL log: %s\n", $_;
+                $desc_min_ref = \%ul_min_desc;
+                $desc_avg_ref = \%ul_avg_desc;
+                $desc_max_ref = \%ul_max_desc;
+
 
             } else {
-                $desc_ref = \%dl_desc;
-                printf "log: %s\n", $_;
+                $desc_min_ref = \%dl_min_desc;
+                $desc_avg_ref = \%dl_avg_desc;
+                $desc_max_ref = \%dl_max_desc;
+                printf "DL log: %s\n", $_;
             }
 
             my %s_low = ('begin' => $times{'begin'}, 'end' => $times{'end'}, 'value' => $latencies[7]);
@@ -96,9 +109,9 @@ if ($rc == 0 and defined $fh) {
 
             # Note, some tests have 0's FEC metrics. log_sample() rejects a sample with all 0's.
 
-            log_sample("flexran", $desc_ref, \%low_name, \%s_low);
-            log_sample("flexran", $desc_ref, \%avg_name, \%s_avg);
-            log_sample("flexran", $desc_ref, \%high_name, \%s_high);
+            log_sample("flexran", $desc_min_ref, \%low_name, \%s_low);
+            log_sample("flexran", $desc_avg_ref, \%avg_name, \%s_avg);
+            log_sample("flexran", $desc_max_ref, \%high_name, \%s_high);
 
             $num_sample++;
         }

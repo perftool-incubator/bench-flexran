@@ -6,7 +6,7 @@ metadata:
 spec:
   ipam: ""
   capabilities: '{ "mac": true }'
-  resourceName: intelnics0
+  resourceName: flexran_fronthaul
   vlan: 10
   spoofChk: "off"
   trust: "on" 
@@ -20,7 +20,7 @@ metadata:
 spec:
   ipam: "" 
   capabilities: '{ "mac": true }'
-  resourceName: intelnics0
+  resourceName: flexran_fronthaul
   vlan: 20
   spoofChk: "off"
   trust: "on" 

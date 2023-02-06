@@ -2,10 +2,10 @@
 apiVersion: sriovnetwork.openshift.io/v1
 kind: SriovNetworkNodePolicy
 metadata:
-  name: policy-intel-west
+  name: policy-intel-flexran
   namespace: openshift-sriov-network-operator
 spec:
-  resourceName: intelnics0
+  resourceName: flexran_fronthaul
   nodeSelector:
     feature.node.kubernetes.io/network-sriov.capable: "true"
   priority: 5
