@@ -104,6 +104,7 @@ fi
 case "${ACTION}" in
     setup)
         setup 
+        ip link set dev ${RU_SRIOV_INTERFACE} mtu ${SRIOV_MTU}
     ;;
     config)
         save_orig
