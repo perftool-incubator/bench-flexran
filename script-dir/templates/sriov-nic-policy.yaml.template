@@ -9,7 +9,7 @@ spec:
   nodeSelector:
     feature.node.kubernetes.io/network-sriov.capable: "true"
   priority: 5
-  mtu: "${SRIOV_MTU}
+  mtu: ${SRIOV_MTU}
   numVfs: 2
   nicSelector:
     rootDevices:
