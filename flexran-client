@@ -37,8 +37,8 @@ if [[ -z ${FLEXRAN_SDK} ]]; then
     export FLEXRAN_NOT_INCLUDED=1
 fi
 
-# The OPENness Operator provides PCIDEVICE_INTEL_COM_INTEL_FEC_5G or PCIDEVICE_INTEL_COM_INTEL_FEC_ACC100
-FEC_DEV_PCI=$(env | grep PCIDEVICE_INTEL_COM_INTEL_FEC | awk -F '=' '{print $2}')
+# The OPENness Operator provides PCIDEVICE_INTEL_COM_INTEL_FEC_5G or PCIDEVICE_INTEL_COM_INTEL_FEC_ACC100. -v to skip PCIDEVICE_INTEL_COM_INTEL_FEC*INFO env
+FEC_DEV_PCI=$(env | grep PCIDEVICE_INTEL_COM_INTEL_FEC | grep -v INFO |  awk -F '=' '{print $2}')
 
 declare -A timer_cfg
         timer_cfg[l1]=$FLEXRAN_NR/l1/phycfg_timer.xml
