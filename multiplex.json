@@ -1,0 +1,43 @@
+{
+  "presets": {
+  },
+  "validations": {
+    "fec_mode": {
+      "description": "FEC mode (hardware or software)",
+      "args": [
+        "fec-mode"
+      ],
+      "vals": "^(hw|sw)$"
+    },
+    "integer_gt_zero": {
+      "description": "a whole number > 0",
+      "args": [
+        "duration"
+      ],
+      "vals": "^[1-9][0-9]*$"
+    },
+    "integer_ge_zero": {
+      "description": "a whole number >= 0",
+      "args": [
+        "cc-num"
+      ],
+      "vals": "^[0-9]+$"
+    },
+    "non_empty_string": {
+      "description": "any non-empty string",
+      "args": [
+        "usr1",
+        "usr2",
+        "usr3",
+        "usr4",
+        "usr5",
+        "test-file",
+        "log-test",
+        "xran-devices",
+        "engine-infra",
+        "oru-dir"
+      ],
+      "vals": "^.+$"
+    }
+  }
+}

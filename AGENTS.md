@@ -1,11 +1,13 @@
-# bench-flexran
+# Bench-flexran
 
-Scripts and configuration to run the FlexRAN (Flexible Radio Access Network) benchmark within the [crucible](https://github.com/perftool-incubator/crucible) performance testing framework.
+## Purpose
+Scripts and configuration to run the FlexRAN (Flexible Radio Access Network) benchmark within the crucible framework. Tests baseband processing performance for 4G/5G workloads.
 
-See the [crucible-examples flexran documentation](https://github.com/perftool-incubator/crucible-examples/blob/main/flexran/README.md) for usage examples.
+## Languages
+- Bash: wrapper scripts (`flexran-base`, `flexran-client`, `flexran-server-start`/`stop`, `flexran-infra`, `flexran-setup-env`, `flexran-runtime`, `driver.sh`)
+- Python: test automation and post-processing (`autotest.py`, `cpu.py`, `log.py`, `process_testfile.py`, `flexran-post-process.py`)
 
 ## Key Files
-
 | File | Purpose |
 |------|---------|
 | `rickshaw.json` | Rickshaw integration: client/server/infra scripts, parameter transformations |
@@ -20,3 +22,8 @@ See the [crucible-examples flexran documentation](https://github.com/perftool-in
 | `flexran-post-process.py` | Parses flexran output into crucible metrics |
 | `autotest.py` | Test automation driver |
 | `workshop.json` | Engine image build requirements |
+
+## Conventions
+- Primary branch is `main`
+- Standard Bash modelines and 4-space indentation
+- Python code follows 4-space indentation with standard modelines
